@@ -1,0 +1,365 @@
+/**
+ * Datenablage: eine Google-Tabelle pro Buch.
+ *
+ * Blatt „Einträge“    – alle Notizen, Figuren, Orte, Gegenstände, Ereignisse, Ideen
+ * Blatt „Beziehungen“ – von Hand gesetzte Beziehungen („Tochter von“ …)
+ * Blatt „Statistik“   – Wortzahl pro Tag
+ *
+ * Die Spalten werden über ihre Überschrift gefunden, damit man die Tabelle
+ * auch von Hand (z. B. in der Tabellen-App am Handy) lesen und bearbeiten kann.
+ */
+
+var BW_PROP_DB = 'BW_DATENBANK';
+var BW_PROP_EINST = 'BW_EINSTELLUNGEN';
+var BW_PROP_ORDNER = 'BW_ORDNER';
+
+var BW_EINTRAG = {
+  blatt: 'Einträge',
+  felder: ['id', 'art', 'name', 'aliase', 'text', 'felder', 'bezug', 'status', 'anker', 'kapitel', 'blatt', 'erstellt', 'geaendert'],
+  koepfe: ['ID', 'Art', 'Name', 'Auch genannt', 'Text', 'Felder', 'Bezug', 'Status', 'Textstelle', 'Kapitel', 'Blatt', 'Erstellt', 'Geändert'],
+  breiten: [90, 80, 160, 160, 360, 260, 90, 80, 90, 160, 90, 120, 120]
+};
+
+var BW_BEZIEHUNG = {
+  blatt: 'Beziehungen',
+  felder: ['id', 'von', 'nach', 'art'],
+  koepfe: ['ID', 'Von', 'Nach', 'Beziehung'],
+  breiten: [90, 90, 90, 200]
+};
+
+var BW_STANDARD = {
+  arten: [
+    { id: 'person', name: 'Person', mehrzahl: 'Personen', icon: '👤', farbe: '#3367d6', hell: '#dfe8fb', woerter: ['Person', 'Figur'], karte: true,
+      felder: ['Alter', 'Aussehen', 'Beruf', 'Charakter', 'Herkunft', 'Ziel / Motivation', 'Sprechweise'] },
+    { id: 'ort', name: 'Ort', mehrzahl: 'Orte', icon: '📍', farbe: '#188038', hell: '#dcf1e3', woerter: ['Ort'], karte: true,
+      felder: ['Art', 'Lage', 'Atmosphäre', 'Besonderheiten'] },
+    { id: 'ding', name: 'Gegenstand', mehrzahl: 'Gegenstände', icon: '🔑', farbe: '#b06000', hell: '#fbecd3', woerter: ['Ding', 'Gegenstand'], karte: true,
+      felder: ['Aussehen', 'Herkunft', 'Bedeutung'] },
+    { id: 'zeit', name: 'Ereignis', mehrzahl: 'Zeitstrahl', icon: '📅', farbe: '#8430ce', hell: '#efe1fb', woerter: ['Zeit', 'Wann'], karte: false, felder: [] },
+    { id: 'idee', name: 'Idee', mehrzahl: 'Ideen', icon: '💡', farbe: '#c5221f', hell: '#fbe0e0', woerter: ['Idee'], karte: false, felder: [] }
+  ],
+  tagesziel: 500,
+  gesamtziel: 0,
+  anheften: true,
+  blaetterAuto: true,
+  kiModell: 'claude-opus-5-5',
+  hinweisGesehen: false
+};
+
+/* ------------------------------------------------------------------ */
+/* Öffentliche Funktionen (werden von der Seitenleiste aufgerufen)     */
+/* ------------------------------------------------------------------ */
+
+/** Lädt alles, was die Seitenleiste zum Start braucht. */
+function bwLaden() {
+  var ss = datenbank_();
+  var doc = DocumentApp.getActiveDocument();
+  var ordnerId = PropertiesService.getDocumentProperties().getProperty(BW_PROP_ORDNER);
+  return {
+    buch: doc.getName(),
+    tabelleUrl: ss.getUrl(),
+    ordnerUrl: ordnerId ? 'https://drive.google.com/drive/folders/' + ordnerId : '',
+    einstellungen: einstellungen_(),
+    eintraege: liesTabelle_(blatt_(ss, BW_EINTRAG), BW_EINTRAG).map(eintragAusZeile_),
+    beziehungen: liesTabelle_(blatt_(ss, BW_BEZIEHUNG), BW_BEZIEHUNG),
+    ki: bwKiStatus()
+  };
+}
+
+/**
+ * Speichert einen Eintrag (neu oder geändert).
+ * optionen.anheften: true → die Notiz wird an die aktuelle Cursor-Stelle geheftet.
+ */
+function bwSpeichern(eintrag, optionen) {
+  optionen = optionen || {};
+  var lock = LockService.getDocumentLock();
+  lock.waitLock(20000);
+  try {
+    var ss = datenbank_();
+    var sheet = blatt_(ss, BW_EINTRAG);
+    var jetzt = zeitstempel_();
+    var e = {
+      id: eintrag.id && String(eintrag.id).indexOf('tmp') !== 0 ? eintrag.id : neueId_(),
+      art: eintrag.art || 'notiz',
+      name: eintrag.name || '',
+      aliase: eintrag.aliase || [],
+      text: eintrag.text || '',
+      felder: eintrag.felder || {},
+      bezug: eintrag.bezug || [],
+      status: eintrag.status || '',
+      anker: eintrag.anker || '',
+      kapitel: eintrag.kapitel || '',
+      blatt: eintrag.blatt || '',
+      erstellt: eintrag.erstellt || jetzt,
+      geaendert: jetzt
+    };
+    var stelle = null;
+    if (optionen.anheften && !e.anker) {
+      stelle = anheften_();
+      if (stelle) {
+        e.anker = stelle.anker;
+        e.kapitel = stelle.kapitel;
+      }
+    }
+    schreibeZeile_(sheet, BW_EINTRAG, eintragZuZeile_(e));
+    var ergebnis = eintragAusZeile_(eintragZuZeile_(e));
+    if (stelle) {
+      ergebnis.pos = stelle.pos;
+      ergebnis.tab = stelle.tab;
+    }
+    return ergebnis;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/** Löscht einen Eintrag samt Textstelle, Beziehungen und (bei Karten) Blatt. */
+function bwLoeschen(id) {
+  var lock = LockService.getDocumentLock();
+  lock.waitLock(20000);
+  try {
+    var ss = datenbank_();
+    var sheet = blatt_(ss, BW_EINTRAG);
+    var zeilen = liesTabelle_(sheet, BW_EINTRAG);
+    var alt = zeilen.filter(function (z) { return z.id === id; })[0];
+    if (!alt) return false;
+    if (alt.anker) ankerEntfernen_(alt.anker);
+    if (alt.blatt) {
+      try { DriveApp.getFileById(alt.blatt).setTrashed(true); } catch (err) { /* schon weg */ }
+    }
+    loescheZeile_(sheet, BW_EINTRAG, id);
+    var bez = blatt_(ss, BW_BEZIEHUNG);
+    liesTabelle_(bez, BW_BEZIEHUNG).forEach(function (b) {
+      if (b.von === id || b.nach === id) loescheZeile_(bez, BW_BEZIEHUNG, b.id);
+    });
+    return true;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function bwBeziehungSpeichern(b) {
+  var sheet = blatt_(datenbank_(), BW_BEZIEHUNG);
+  var zeile = { id: b.id && String(b.id).indexOf('tmp') !== 0 ? b.id : neueId_(), von: b.von, nach: b.nach, art: b.art || '' };
+  schreibeZeile_(sheet, BW_BEZIEHUNG, zeile);
+  return zeile;
+}
+
+function bwBeziehungLoeschen(id) {
+  loescheZeile_(blatt_(datenbank_(), BW_BEZIEHUNG), BW_BEZIEHUNG, id);
+  return true;
+}
+
+function bwEinstellungenSpeichern(neu) {
+  PropertiesService.getDocumentProperties().setProperty(BW_PROP_EINST, JSON.stringify(neu));
+  return einstellungen_();
+}
+
+/* ------------------------------------------------------------------ */
+/* Einstellungen                                                       */
+/* ------------------------------------------------------------------ */
+
+function einstellungen_() {
+  var roh = PropertiesService.getDocumentProperties().getProperty(BW_PROP_EINST);
+  var gespeichert = {};
+  try { gespeichert = roh ? JSON.parse(roh) : {}; } catch (err) { gespeichert = {}; }
+  var e = JSON.parse(JSON.stringify(BW_STANDARD));
+  Object.keys(gespeichert).forEach(function (k) { e[k] = gespeichert[k]; });
+  return e;
+}
+
+/* ------------------------------------------------------------------ */
+/* Tabelle                                                             */
+/* ------------------------------------------------------------------ */
+
+var bwCacheDb_ = null;
+
+/** Öffnet die Tabelle zum Dokument – oder legt sie neben dem Dokument an. */
+function datenbank_() {
+  if (bwCacheDb_) return bwCacheDb_;
+  var props = PropertiesService.getDocumentProperties();
+  var id = props.getProperty(BW_PROP_DB);
+  var ss = null;
+  if (id) {
+    try {
+      if (!DriveApp.getFileById(id).isTrashed()) ss = SpreadsheetApp.openById(id);
+    } catch (err) {
+      ss = null;
+    }
+  }
+  if (!ss) {
+    var doc = DocumentApp.getActiveDocument();
+    ss = SpreadsheetApp.create(doc.getName() + ' – Buchwerkstatt');
+    neben_(ss.getId(), doc.getId());
+    var erstes = ss.getSheets()[0];
+    erstes.setName(BW_EINTRAG.blatt);
+    props.setProperty(BW_PROP_DB, ss.getId());
+  }
+  bwCacheDb_ = ss;
+  return ss;
+}
+
+/** Verschiebt eine neu angelegte Datei in den Ordner des Manuskripts. */
+function neben_(dateiId, docId) {
+  try {
+    var eltern = DriveApp.getFileById(docId).getParents();
+    if (eltern.hasNext()) DriveApp.getFileById(dateiId).moveTo(eltern.next());
+  } catch (err) {
+    // Ohne Zugriff auf den Ordner bleibt die Datei in „Meine Ablage“.
+  }
+}
+
+function blatt_(ss, def) {
+  var sheet = ss.getSheetByName(def.blatt);
+  if (!sheet) sheet = ss.insertSheet(def.blatt);
+  if (sheet.getLastRow() === 0) {
+    sheet.getRange(1, 1, 1, def.koepfe.length).setValues([def.koepfe]).setFontWeight('bold').setBackground('#f1f3f4');
+    sheet.setFrozenRows(1);
+    // Alles als reinen Text speichern, sonst macht die Tabelle aus „12. März“ ein Datum.
+    sheet.getRange(1, 1, sheet.getMaxRows(), def.koepfe.length).setNumberFormat('@');
+    def.breiten.forEach(function (b, i) { sheet.setColumnWidth(i + 1, b); });
+  }
+  return sheet;
+}
+
+/** Spaltennummer (0-basiert) je Feld, anhand der Überschriften. Fehlende Spalten werden ergänzt. */
+function spalten_(sheet, def) {
+  var breite = Math.max(sheet.getLastColumn(), 1);
+  var koepfe = sheet.getRange(1, 1, 1, breite).getValues()[0].map(String);
+  var index = {};
+  def.felder.forEach(function (f, i) {
+    var pos = koepfe.indexOf(def.koepfe[i]);
+    if (pos < 0) {
+      pos = koepfe.length;
+      koepfe.push(def.koepfe[i]);
+      sheet.getRange(1, pos + 1).setValue(def.koepfe[i]).setFontWeight('bold').setBackground('#f1f3f4');
+    }
+    index[f] = pos;
+  });
+  index._breite = koepfe.length;
+  return index;
+}
+
+function liesTabelle_(sheet, def) {
+  var index = spalten_(sheet, def);
+  var n = sheet.getLastRow() - 1;
+  if (n <= 0) return [];
+  var werte = sheet.getRange(2, 1, n, index._breite).getValues();
+  var ergebnis = [];
+  werte.forEach(function (zeile, i) {
+    var obj = {};
+    def.felder.forEach(function (f) { obj[f] = alsText_(zeile[index[f]]); });
+    var leer = def.felder.every(function (f) { return obj[f] === ''; });
+    if (leer) return;
+    if (!obj.id) {
+      // Zeile wurde von Hand in der Tabelle ergänzt – ID nachtragen.
+      obj.id = neueId_();
+      sheet.getRange(i + 2, index.id + 1).setValue(obj.id);
+    }
+    ergebnis.push(obj);
+  });
+  return ergebnis;
+}
+
+function schreibeZeile_(sheet, def, obj) {
+  var index = spalten_(sheet, def);
+  var nr = zeileVon_(sheet, index, obj.id);
+  var zeile;
+  if (nr) {
+    zeile = sheet.getRange(nr, 1, 1, index._breite).getValues()[0];
+  } else {
+    zeile = [];
+    for (var i = 0; i < index._breite; i++) zeile.push('');
+    nr = sheet.getLastRow() + 1;
+  }
+  def.felder.forEach(function (f) { zeile[index[f]] = obj[f] == null ? '' : String(obj[f]); });
+  var bereich = sheet.getRange(nr, 1, 1, index._breite);
+  bereich.setNumberFormat('@');
+  bereich.setValues([zeile]);
+}
+
+function loescheZeile_(sheet, def, id) {
+  var nr = zeileVon_(sheet, spalten_(sheet, def), id);
+  if (nr) sheet.deleteRow(nr);
+}
+
+function zeileVon_(sheet, index, id) {
+  if (!id || sheet.getLastRow() < 2) return 0;
+  var treffer = sheet.getRange(2, index.id + 1, sheet.getLastRow() - 1, 1)
+    .createTextFinder(String(id)).matchEntireCell(true).findNext();
+  return treffer ? treffer.getRow() : 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* Umwandlung Zeile ⇄ Eintrag                                          */
+/* ------------------------------------------------------------------ */
+
+function eintragZuZeile_(e) {
+  return {
+    id: e.id,
+    art: e.art,
+    name: e.name,
+    aliase: (e.aliase || []).join(', '),
+    text: e.text,
+    felder: felderZuText_(e.felder || {}),
+    bezug: (e.bezug || []).join(', '),
+    status: e.status,
+    anker: e.anker,
+    kapitel: e.kapitel,
+    blatt: e.blatt,
+    erstellt: e.erstellt,
+    geaendert: e.geaendert
+  };
+}
+
+function eintragAusZeile_(z) {
+  return {
+    id: z.id,
+    art: (z.art || 'notiz').toLowerCase(),
+    name: z.name,
+    aliase: liste_(z.aliase),
+    text: z.text,
+    felder: felderAusText_(z.felder),
+    bezug: liste_(z.bezug),
+    status: z.status,
+    anker: z.anker,
+    kapitel: z.kapitel,
+    blatt: z.blatt,
+    erstellt: z.erstellt,
+    geaendert: z.geaendert
+  };
+}
+
+/** Felder werden lesbar gespeichert: eine Zeile pro Feld, „Alter: 34“. */
+function felderZuText_(felder) {
+  return Object.keys(felder)
+    .filter(function (k) { return String(felder[k] || '').trim() !== ''; })
+    .map(function (k) { return k + ': ' + String(felder[k]).replace(/\n/g, ' / '); })
+    .join('\n');
+}
+
+function felderAusText_(text) {
+  var felder = {};
+  String(text || '').split('\n').forEach(function (zeile) {
+    var m = zeile.match(/^([^:]{1,40}):\s?(.*)$/);
+    if (m) felder[m[1].trim()] = m[2].trim();
+  });
+  return felder;
+}
+
+function liste_(text) {
+  return String(text || '').split(',').map(function (s) { return s.trim(); }).filter(String);
+}
+
+function alsText_(wert) {
+  if (wert instanceof Date) return Utilities.formatDate(wert, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm');
+  return wert == null ? '' : String(wert);
+}
+
+function zeitstempel_() {
+  return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm');
+}
+
+function neueId_() {
+  return Utilities.getUuid().replace(/-/g, '').slice(0, 10);
+}

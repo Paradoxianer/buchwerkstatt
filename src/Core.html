@@ -1,0 +1,333 @@
+<script>
+/**
+ * Kernlogik der Seitenleiste – ohne Oberfläche, damit sie testbar ist.
+ *
+ * - parseNotiz:    Erkennt am Anfangswort, was aus einer Notiz wird („Person Lena: …“).
+ * - baueIndex:     Alle Namen und „Auch genannt“-Bezeichnungen der Karten.
+ * - findeVerweise: Findet Namen und @-Erwähnungen in einem Text.
+ * - parseDatum:    Macht aus „12. März“, „3.4.1987“ oder „Tag 5“ eine sortierbare Zahl.
+ */
+var BWCore = (function () {
+  var BUCHSTABE = /[\p{L}\p{N}_]/u;
+  var NAMENS_FUELLWOERTER = ['von', 'van', 'de', 'der', 'die', 'das', 'den', 'la', 'le', 'du', 'zu', 'und', 'Herr', 'Frau', 'Dr.', 'Doktor', 'Onkel', 'Tante', 'Opa', 'Oma'];
+
+  var NOTIZ_ART = { id: 'notiz', name: 'Notiz', mehrzahl: 'Notizen', icon: '📝', farbe: '#5f6368', hell: '#eceff1', woerter: [], karte: false, felder: [] };
+
+  function alleArten(einstellungen) {
+    return (einstellungen.arten || []).concat([NOTIZ_ART]);
+  }
+
+  function artenMap(einstellungen) {
+    var map = {};
+    alleArten(einstellungen).forEach(function (a) { map[a.id] = a; });
+    return map;
+  }
+
+  function istBuchstabe(z) {
+    return !!z && BUCHSTABE.test(z);
+  }
+
+  function maskiere(s) {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* Notiz zerlegen                                                    */
+  /* ---------------------------------------------------------------- */
+
+  var MONATE = {
+    jan: 1, januar: 1, 'jänner': 1, feb: 2, februar: 2, 'mär': 3, 'märz': 3, maerz: 3, mrz: 3, apr: 4, april: 4,
+    mai: 5, jun: 6, juni: 6, jul: 7, juli: 7, aug: 8, august: 8, sep: 9, sept: 9, september: 9,
+    okt: 10, oktober: 10, nov: 11, november: 11, dez: 12, dezember: 12
+  };
+
+  function siehtAusWieName(name) {
+    var woerter = name.split(/\s+/).filter(Boolean);
+    if (!woerter.length || woerter.length > 4) return false;
+    var erstes = woerter[0].replace(/^@/, '');
+    return /^[\p{Lu}\p{N}]/u.test(erstes);
+  }
+
+  function siehtAusWieDatum(text) {
+    if (/\d/.test(text)) return true;
+    return text.toLowerCase().split(/[\s.,]+/).some(function (w) { return MONATE[w]; });
+  }
+
+  /**
+   * Zerlegt eine Notiz anhand des Anfangsworts.
+   * Ergebnis: { art, name, text, wort, erkannt }
+   *   „Person Lena: Hebamme“      → art person, name „Lena“, text „Hebamme“
+   *   „Zeit 12. März: Treffen“    → art zeit,   name „12. März“ (das Datum)
+   *   „Idee: Jonas ist der Bruder“→ art idee,   name „“
+   *   alles andere                → art notiz
+   */
+  function parseNotiz(eingabe, arten) {
+    var roh = String(eingabe || '');
+    var t = roh.replace(/^\s+/, '');
+    var notiz = { art: 'notiz', name: '', text: roh.trim(), wort: '', erkannt: false };
+    var m = t.match(/^#?([\p{L}]+)(?=[\s:]|$)/u);
+    if (!m) return notiz;
+    var wort = m[1].toLowerCase();
+    var art = null;
+    arten.forEach(function (a) {
+      (a.woerter || []).forEach(function (w) { if (!art && w.toLowerCase() === wort) art = a; });
+    });
+    if (!art) return notiz;
+
+    var rest = t.slice(m[0].length);
+    var umbruch = rest.indexOf('\n');
+    var erste = umbruch < 0 ? rest : rest.slice(0, umbruch);
+    var weitere = umbruch < 0 ? '' : rest.slice(umbruch + 1);
+    var doppelpunkt = erste.search(/:(\s|$)/);
+    var name, text;
+    if (doppelpunkt >= 0) {
+      name = erste.slice(0, doppelpunkt).trim();
+      text = (erste.slice(doppelpunkt + 1).trim() + (weitere ? '\n' + weitere : '')).trim();
+    } else if (art.karte) {
+      name = erste.trim();
+      text = weitere.trim();
+      // „Ort und Zeit sind unklar“ ist keine neue Karte, „Ort Hafen“ schon.
+      if (!name || !siehtAusWieName(name)) return notiz;
+    } else if (art.id === 'zeit') {
+      name = erste.trim();
+      text = weitere.trim();
+      if (!name || !siehtAusWieDatum(name)) return notiz;
+    } else {
+      name = '';
+      text = rest.trim();
+    }
+    name = name.replace(/^@/, '');
+    return { art: art.id, name: name, text: text, wort: m[1], erkannt: true };
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* Namen finden                                                      */
+  /* ---------------------------------------------------------------- */
+
+  /**
+   * Baut das Verzeichnis aller Namen.
+   * Neben Name und „Auch genannt“ werden Vor- und Nachname einzeln erkannt
+   * („Heinrich Berger“ → auch „Heinrich“ und „Berger“), solange das eindeutig ist.
+   */
+  function baueIndex(eintraege, arten) {
+    var karte = {};
+    arten.forEach(function (a) { if (a.karte) karte[a.id] = true; });
+    var namen = {};
+    function eintragen(n, id, schwach) {
+      n = String(n || '').trim().replace(/^@/, '');
+      if (n.length < 2) return;
+      var e = namen[n];
+      if (!e) {
+        namen[n] = { ids: [id], schwach: schwach };
+        return;
+      }
+      if (e.schwach && !schwach) {
+        namen[n] = { ids: [id], schwach: false };
+        return;
+      }
+      if (e.schwach === schwach && e.ids.indexOf(id) < 0) e.ids.push(id);
+    }
+    var karten = eintraege.filter(function (e) { return karte[e.art] && e.name; });
+    karten.forEach(function (e) {
+      eintragen(e.name, e.id, false);
+      (e.aliase || []).forEach(function (a) { eintragen(a, e.id, false); });
+    });
+    karten.forEach(function (e) {
+      var teile = e.name.split(/\s+/);
+      if (teile.length < 2) return;
+      teile.forEach(function (teil) {
+        if (teil.length >= 3 && /^\p{Lu}/u.test(teil) && NAMENS_FUELLWOERTER.indexOf(teil) < 0) eintragen(teil, e.id, true);
+      });
+    });
+    var liste = Object.keys(namen).sort(function (a, b) { return b.length - a.length; });
+    var regex = liste.length
+      ? new RegExp('(?<![\\p{L}\\p{N}_@])(' + liste.map(maskiere).join('|') + ')(?=(?:s|\'s|’s)?(?![\\p{L}\\p{N}_]))', 'gu')
+      : null;
+    return { namen: namen, liste: liste, regex: regex };
+  }
+
+  /**
+   * Findet alle Verweise in einem Text, sortiert nach Position.
+   * Treffer: { start, ende, text, ids, at, neu }
+   *   at:  per @ erwähnt     neu: @-Name, den es noch nicht gibt
+   */
+  function findeVerweise(text, index) {
+    text = String(text || '');
+    var treffer = [];
+    for (var i = 0; i < text.length; i++) {
+      if (text[i] !== '@' || istBuchstabe(text[i - 1])) continue;
+      var gefunden = null;
+      for (var k = 0; k < index.liste.length; k++) {
+        var n = index.liste[k];
+        if (text.startsWith(n, i + 1)) {
+          var nach = text.slice(i + 1 + n.length);
+          if (!istBuchstabe(nach[0]) || /^(s|'s|’s)(?![\p{L}\p{N}_])/u.test(nach)) {
+            gefunden = n;
+            break;
+          }
+        }
+      }
+      if (gefunden) {
+        treffer.push({ start: i, ende: i + 1 + gefunden.length, text: gefunden, ids: index.namen[gefunden].ids.slice(), at: true, neu: false });
+        i += gefunden.length;
+      } else {
+        var m = text.slice(i + 1).match(/^[\p{L}\p{N}_-]+(?:[ \t]+\p{Lu}[\p{L}\p{N}_-]*){0,2}/u);
+        if (m) {
+          treffer.push({ start: i, ende: i + 1 + m[0].length, text: m[0], ids: [], at: true, neu: true });
+          i += m[0].length;
+        }
+      }
+    }
+    if (index.regex) {
+      index.regex.lastIndex = 0;
+      var m2;
+      while ((m2 = index.regex.exec(text))) {
+        var start = m2.index, ende = start + m2[1].length;
+        var belegt = treffer.some(function (t) { return start < t.ende && ende > t.start; });
+        if (!belegt) treffer.push({ start: start, ende: ende, text: m2[1], ids: index.namen[m2[1]].ids.slice(), at: false, neu: false });
+      }
+    }
+    return treffer.sort(function (a, b) { return a.start - b.start; });
+  }
+
+  /** Alle Karten, auf die ein Eintrag verweist (über Text, Felder und Bezug). */
+  function verweisIds(eintrag, index) {
+    var ids = {};
+    var texte = [eintrag.text];
+    Object.keys(eintrag.felder || {}).forEach(function (k) { texte.push(eintrag.felder[k]); });
+    texte.forEach(function (t) {
+      findeVerweise(t, index).forEach(function (v) { v.ids.forEach(function (id) { ids[id] = true; }); });
+    });
+    (eintrag.bezug || []).forEach(function (id) { ids[id] = true; });
+    delete ids[eintrag.id];
+    return Object.keys(ids);
+  }
+
+  /**
+   * Verbindungen zwischen allen Einträgen.
+   * raus[id] = Karten, auf die der Eintrag verweist
+   * rein[id] = Einträge, die auf die Karte verweisen
+   */
+  function verbindungen(eintraege, index, beziehungen) {
+    var raus = {}, rein = {};
+    function verbinde(von, nach) {
+      (raus[von] = raus[von] || []).indexOf(nach) < 0 && raus[von].push(nach);
+      (rein[nach] = rein[nach] || []).indexOf(von) < 0 && rein[nach].push(von);
+    }
+    eintraege.forEach(function (e) {
+      verweisIds(e, index).forEach(function (id) { verbinde(e.id, id); });
+    });
+    (beziehungen || []).forEach(function (b) {
+      verbinde(b.von, b.nach);
+    });
+    return { raus: raus, rein: rein };
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* Datum im Buch                                                     */
+  /* ---------------------------------------------------------------- */
+
+  /**
+   * Sortierbare Zahl aus einer Datumsangabe – oder null, wenn nichts erkennbar ist.
+   * Fehlt das Jahr („12. März“), gilt standardJahr (das häufigste Jahr im Zeitstrahl).
+   */
+  function parseDatum(eingabe, standardJahr) {
+    var s = String(eingabe || '').toLowerCase().trim();
+    if (!s) return null;
+    var uhr = 0;
+    var mu = s.match(/(\d{1,2}):(\d{2})/) || s.match(/(\d{1,2})(?:[.:](\d{2}))?\s*uhr/);
+    if (mu) uhr = (Number(mu[1]) * 60 + Number(mu[2] || 0)) / 1440;
+    var m;
+    if ((m = s.match(/^tag\s*(\d+)/))) return Number(m[1]) + uhr;
+    if ((m = s.match(/(\d{4})-(\d{1,2})-(\d{1,2})/))) return Number(m[1]) * 10000 + Number(m[2]) * 100 + Number(m[3]) + uhr;
+    if ((m = s.match(/(\d{1,2})\.\s*(\d{1,2})\.(?:\s*(\d{2,4}))?/))) {
+      return jahr(m[3], standardJahr) * 10000 + Number(m[2]) * 100 + Number(m[1]) + uhr;
+    }
+    if ((m = s.match(/(\d{1,2})\.?\s*([a-zäöü]+)\.?(?:\s+(\d{2,4}))?/)) && MONATE[m[2]]) {
+      return jahr(m[3], standardJahr) * 10000 + MONATE[m[2]] * 100 + Number(m[1]) + uhr;
+    }
+    if ((m = s.match(/([a-zäöü]+)\.?\s+(\d{3,4})/)) && MONATE[m[1]]) return Number(m[2]) * 10000 + MONATE[m[1]] * 100;
+    if ((m = s.match(/^([a-zäöü]+)/)) && MONATE[m[1]]) return (standardJahr || 0) * 10000 + MONATE[m[1]] * 100;
+    if ((m = s.match(/^(\d{3,4})\b/))) return Number(m[1]) * 10000;
+    return null;
+  }
+
+  function jahr(j, standardJahr) {
+    if (!j) return standardJahr || 0;
+    var n = Number(j);
+    return j.length === 2 ? (n < 50 ? 2000 + n : 1900 + n) : n;
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* Darstellung                                                       */
+  /* ---------------------------------------------------------------- */
+
+  /** Text als HTML mit anklickbaren Namen. */
+  function textMitVerweisen(text, index, eintragVon, artVon) {
+    text = String(text || '');
+    var html = '';
+    var pos = 0;
+    findeVerweise(text, index).forEach(function (v) {
+      html += escapeHtml(text.slice(pos, v.start));
+      if (v.neu) {
+        html += '<button type="button" class="ref neu" data-neu="' + escapeHtml(v.text) + '" title="Neu anlegen">@' + escapeHtml(v.text) + '</button>';
+      } else {
+        var e = eintragVon[v.ids[0]];
+        var art = e ? artVon[e.art] : null;
+        var farbe = art ? art.farbe : '#5f6368';
+        var mehr = v.ids.length > 1 ? ' data-ids="' + v.ids.join(',') + '"' : '';
+        html += '<button type="button" class="ref" data-id="' + v.ids[0] + '"' + mehr + ' style="--c:' + farbe + '">' + escapeHtml(v.text) + '</button>';
+      }
+      pos = v.ende;
+    });
+    html += escapeHtml(text.slice(pos));
+    return html.replace(/\n/g, '<br>');
+  }
+
+  /** Das häufigste ausdrücklich genannte Jahr unter den Datumsangaben. */
+  function haeufigstesJahr(daten) {
+    var zaehler = {}, bestes = 0;
+    daten.forEach(function (d) {
+      var m = String(d || '').match(/\b(\d{4})\b/);
+      if (!m) return;
+      zaehler[m[1]] = (zaehler[m[1]] || 0) + 1;
+      if (!bestes || zaehler[m[1]] > zaehler[bestes]) bestes = m[1];
+    });
+    return bestes ? Number(bestes) : 0;
+  }
+
+  function ausschnitt(text, laenge) {
+    text = String(text || '').replace(/\s+/g, ' ').trim();
+    return text.length > laenge ? text.slice(0, laenge - 1).trim() + '…' : text;
+  }
+
+  function wortzahl(text) {
+    var m = String(text || '').match(/[^\s]+/g);
+    return m ? m.length : 0;
+  }
+
+  return {
+    NOTIZ_ART: NOTIZ_ART,
+    alleArten: alleArten,
+    artenMap: artenMap,
+    parseNotiz: parseNotiz,
+    baueIndex: baueIndex,
+    findeVerweise: findeVerweise,
+    verweisIds: verweisIds,
+    verbindungen: verbindungen,
+    parseDatum: parseDatum,
+    haeufigstesJahr: haeufigstesJahr,
+    textMitVerweisen: textMitVerweisen,
+    escapeHtml: escapeHtml,
+    ausschnitt: ausschnitt,
+    wortzahl: wortzahl
+  };
+})();
+if (typeof module !== 'undefined') module.exports = BWCore;
+</script>

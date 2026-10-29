@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <?!= include('Styles'); ?>
+</head>
+<body>
+  <div id="app">
+    <header class="kopf">
+      <div class="kopf-titel" id="buchtitel">Buchwerkstatt</div>
+      <div class="kopf-status" id="status" aria-live="polite"></div>
+    </header>
+    <div id="spot" class="spot" hidden></div>
+    <main id="ansicht" class="ansicht">
+      <div class="laden"><div class="kreisel"></div>Buchwerkstatt wird geladen …</div>
+    </main>
+    <div id="toast" class="toast" hidden></div>
+    <nav class="leiste" id="leiste">
+      <button data-nav="notizen" class="aktiv" title="Notizen"><span>📝</span>Notizen</button>
+      <button data-nav="welt" title="Figuren, Orte, Gegenstände"><span>👥</span>Welt</button>
+      <button data-nav="zeit" title="Zeitstrahl"><span>📅</span>Zeit</button>
+      <button data-nav="pinnwand" title="Pinnwand mit Ideen"><span>💡</span>Ideen</button>
+      <button data-nav="ziel" title="Schreibziel"><span>🎯</span>Ziel</button>
+      <button data-nav="einstellungen" title="Einstellungen"><span>⚙️</span>Mehr</button>
+    </nav>
+  </div>
+  <?!= include('Core'); ?>
+  <?!= include('App'); ?>
+</body>
+</html>
