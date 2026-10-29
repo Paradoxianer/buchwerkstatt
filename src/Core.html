@@ -9,7 +9,10 @@
  */
 var BWCore = (function () {
   var BUCHSTABE = /[\p{L}\p{N}_]/u;
-  var NAMENS_FUELLWOERTER = ['von', 'van', 'de', 'der', 'die', 'das', 'den', 'la', 'le', 'du', 'zu', 'und', 'Herr', 'Frau', 'Dr.', 'Doktor', 'Onkel', 'Tante', 'Opa', 'Oma'];
+  // Teile von Namen, die allein kein Name sind („Herr Kowalski“ → nicht „Herr“).
+  var NAMENS_FUELLWOERTER = ['von', 'van', 'de', 'der', 'die', 'das', 'den', 'la', 'le', 'du', 'zu', 'und', 'of', 'the', 'and',
+    'Herr', 'Frau', 'Dr.', 'Doktor', 'Onkel', 'Tante', 'Opa', 'Oma', 'Mr.', 'Mrs.', 'Ms.', 'Miss', 'Sir', 'Lady', 'Lord',
+    'Uncle', 'Aunt', 'The', 'Der', 'Die', 'Das'];
 
   var NOTIZ_ART = { id: 'notiz', name: 'Notiz', mehrzahl: 'Notizen', icon: '📝', farbe: '#5f6368', hell: '#eceff1', woerter: [], karte: false, felder: [] };
 
@@ -41,11 +44,22 @@ var BWCore = (function () {
   /* Notiz zerlegen                                                    */
   /* ---------------------------------------------------------------- */
 
+  // Monatsnamen in allen unterstützten Sprachen (Deutsch, Englisch).
   var MONATE = {
-    jan: 1, januar: 1, 'jänner': 1, feb: 2, februar: 2, 'mär': 3, 'märz': 3, maerz: 3, mrz: 3, apr: 4, april: 4,
-    mai: 5, jun: 6, juni: 6, jul: 7, juli: 7, aug: 8, august: 8, sep: 9, sept: 9, september: 9,
-    okt: 10, oktober: 10, nov: 11, november: 11, dez: 12, dezember: 12
+    jan: 1, januar: 1, 'jänner': 1, january: 1,
+    feb: 2, februar: 2, february: 2,
+    'mär': 3, 'märz': 3, maerz: 3, mrz: 3, mar: 3, march: 3,
+    apr: 4, april: 4,
+    mai: 5, may: 5,
+    jun: 6, juni: 6, june: 6,
+    jul: 7, juli: 7, july: 7,
+    aug: 8, august: 8,
+    sep: 9, sept: 9, september: 9,
+    okt: 10, oktober: 10, oct: 10, october: 10,
+    nov: 11, november: 11,
+    dez: 12, dezember: 12, dec: 12, december: 12
   };
+  var TAG_WOERTER = ['tag', 'day'];
 
   function siehtAusWieName(name) {
     var woerter = name.split(/\s+/).filter(Boolean);
@@ -56,7 +70,7 @@ var BWCore = (function () {
 
   function siehtAusWieDatum(text) {
     if (/\d/.test(text)) return true;
-    return text.toLowerCase().split(/[\s.,]+/).some(function (w) { return MONATE[w]; });
+    return text.toLowerCase().split(/[\s.,]+/).some(function (w) { return MONATE[w] || TAG_WOERTER.indexOf(w) >= 0; });
   }
 
   /**
@@ -241,19 +255,27 @@ var BWCore = (function () {
     var s = String(eingabe || '').toLowerCase().trim();
     if (!s) return null;
     var uhr = 0;
-    var mu = s.match(/(\d{1,2}):(\d{2})/) || s.match(/(\d{1,2})(?:[.:](\d{2}))?\s*uhr/);
-    if (mu) uhr = (Number(mu[1]) * 60 + Number(mu[2] || 0)) / 1440;
+    var mu = s.match(/(\d{1,2}):(\d{2})\s*(am|pm)?/) || s.match(/(\d{1,2})(?:[.:](\d{2}))?\s*(uhr|am|pm)/);
+    if (mu) {
+      var stunde = Number(mu[1]) % (mu[3] === 'am' || mu[3] === 'pm' ? 12 : 24) + (mu[3] === 'pm' ? 12 : 0);
+      uhr = (stunde * 60 + Number(mu[2] || 0)) / 1440;
+    }
     var m;
-    if ((m = s.match(/^tag\s*(\d+)/))) return Number(m[1]) + uhr;
+    if ((m = s.match(/^(\p{L}+)\s*(\d+)/u)) && TAG_WOERTER.indexOf(m[1]) >= 0) return Number(m[2]) + uhr;
     if ((m = s.match(/(\d{4})-(\d{1,2})-(\d{1,2})/))) return Number(m[1]) * 10000 + Number(m[2]) * 100 + Number(m[3]) + uhr;
     if ((m = s.match(/(\d{1,2})\.\s*(\d{1,2})\.(?:\s*(\d{2,4}))?/))) {
       return jahr(m[3], standardJahr) * 10000 + Number(m[2]) * 100 + Number(m[1]) + uhr;
     }
-    if ((m = s.match(/(\d{1,2})\.?\s*([a-zäöü]+)\.?(?:\s+(\d{2,4}))?/)) && MONATE[m[2]]) {
+    // „12. März 1987“, „12 March 1987“, „12th of March“
+    if ((m = s.match(/(\d{1,2})(?:\.|st|nd|rd|th)?\s*(?:of\s+)?(\p{L}+)\.?,?(?:\s+(\d{2,4}))?/u)) && MONATE[m[2]]) {
       return jahr(m[3], standardJahr) * 10000 + MONATE[m[2]] * 100 + Number(m[1]) + uhr;
     }
-    if ((m = s.match(/([a-zäöü]+)\.?\s+(\d{3,4})/)) && MONATE[m[1]]) return Number(m[2]) * 10000 + MONATE[m[1]] * 100;
-    if ((m = s.match(/^([a-zäöü]+)/)) && MONATE[m[1]]) return (standardJahr || 0) * 10000 + MONATE[m[1]] * 100;
+    // „March 12, 1987“, „March 12th“
+    if ((m = s.match(/(\p{L}+)\.?\s+(\d{1,2})(?:st|nd|rd|th)?(?![\d])(?:,?\s+(\d{3,4}))?/u)) && MONATE[m[1]]) {
+      return jahr(m[3], standardJahr) * 10000 + MONATE[m[1]] * 100 + Number(m[2]) + uhr;
+    }
+    if ((m = s.match(/(\p{L}+)\.?\s+(\d{3,4})/u)) && MONATE[m[1]]) return Number(m[2]) * 10000 + MONATE[m[1]] * 100;
+    if ((m = s.match(/^(\p{L}+)/u)) && MONATE[m[1]]) return (standardJahr || 0) * 10000 + MONATE[m[1]] * 100;
     if ((m = s.match(/^(\d{3,4})\b/))) return Number(m[1]) * 10000;
     return null;
   }

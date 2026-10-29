@@ -9,10 +9,20 @@
  *
  * Der API-Schlüssel liegt in den Benutzer-Eigenschaften – er ist nur für die
  * Person sichtbar, die ihn eingetragen hat, und steht nicht im Dokument.
+ *
+ * Die Anweisungen an die KI sind englisch; geantwortet wird in der Sprache
+ * der Seitenleiste (siehe kiSprache_).
+ *
+ * Alles hier ist optional: Ohne Schlüssel blendet die Seitenleiste die KI aus.
  */
 
 var BW_KI_URL = 'https://api.anthropic.com/v1/messages';
 var BW_PROP_KI = 'BW_ANTHROPIC_KEY';
+var BW_KI_SPRACHEN = { de: 'German', en: 'English' };
+
+function kiSprache_() {
+  return BW_KI_SPRACHEN[sprache_()] || 'English';
+}
 
 function bwKiStatus() {
   var key = PropertiesService.getUserProperties().getProperty(BW_PROP_KI);
@@ -55,25 +65,26 @@ function bwKiFelder(anfrage) {
     additionalProperties: false
   };
 
-  var system = 'Du unterstützt eine Romanautorin beim Pflegen ihrer Kartei (Figuren, Orte, Gegenstände). ' +
-    'Du liest ihre Notizen und trägst die Angaben in Felder ein. Halte dich streng an den Text: ' +
-    'nichts erfinden, nichts ausschmücken. Steht zu einem Feld nichts im Text, gib einen leeren String zurück. ' +
-    'Schreibe knapp und stichpunktartig auf Deutsch, so wie man es auf eine Karteikarte schreibt. ' +
-    'Widersprechen sich Angaben, nimm die neueste und hänge „(früher: …)“ an.';
+  var system = 'You help a novelist maintain their story bible (characters, places, objects). ' +
+    'You read their notes and fill in the fields of a card. Stick strictly to the text: ' +
+    'invent nothing, embellish nothing. If the text says nothing about a field, return an empty string. ' +
+    'Write short, note-style values like on an index card. ' +
+    'If statements contradict each other, use the latest one and append "(earlier: …)". ' +
+    'Write all values in ' + kiSprache_() + ', even if the notes are in another language.';
 
   var felderListe = anfrage.felder.map(function (f, i) {
-    var alt = anfrage.vorhanden && anfrage.vorhanden[f] ? ' (bisher: „' + anfrage.vorhanden[f] + '“)' : '';
+    var alt = anfrage.vorhanden && anfrage.vorhanden[f] ? ' (current value: "' + anfrage.vorhanden[f] + '")' : '';
     return schluessel[i] + ' = ' + f + alt;
   }).join('\n');
 
-  var prompt = 'Karte: ' + anfrage.art + ' „' + anfrage.name + '“\n\n' +
-    'Felder (Schlüssel = Bedeutung):\n' + felderListe + '\n\n' +
-    'Freitext der Karte:\n' + (anfrage.text || '(leer)') + '\n\n' +
-    (anfrage.notizen && anfrage.notizen.length ? 'Notizen, die diese Karte erwähnen (älteste zuerst):\n- ' + anfrage.notizen.join('\n- ') + '\n\n' : '') +
-    'Andere Karten in diesem Buch: ' + (anfrage.namen || []).join(', ') + '\n\n' +
-    'Zusätzlich:\n' +
-    '- aliase: andere Bezeichnungen, unter denen „' + anfrage.name + '“ im Text vorkommt (Spitznamen, Rollen wie „der Vater“, Nachname). Nur was im Text steht.\n' +
-    '- beziehungen: Verbindungen zu anderen Karten aus der Liste oben. name = genau der Name aus der Liste, art = kurze Bezeichnung aus Sicht von „' + anfrage.name + '“, z. B. „Tochter von“, „wohnt in“, „gehört“.';
+  var prompt = 'Card: ' + anfrage.art + ' "' + anfrage.name + '"\n\n' +
+    'Fields (key = meaning):\n' + felderListe + '\n\n' +
+    'Free text of the card:\n' + (anfrage.text || '(empty)') + '\n\n' +
+    (anfrage.notizen && anfrage.notizen.length ? 'Notes that mention this card (oldest first):\n- ' + anfrage.notizen.join('\n- ') + '\n\n' : '') +
+    'Other cards in this book: ' + (anfrage.namen || []).join(', ') + '\n\n' +
+    'Also:\n' +
+    '- aliase: other names by which "' + anfrage.name + '" is referred to in the text (nicknames, roles like "the father", surname). Only what appears in the text.\n' +
+    '- beziehungen: connections to other cards from the list above. name = exactly the name from the list, art = a short label from the point of view of "' + anfrage.name + '", e.g. "daughter of", "lives in", "belongs to" – written in ' + kiSprache_() + '.';
 
   var antwort = kiAnfrage_(system, prompt, schema, 4000);
   var felder = {};
@@ -106,23 +117,23 @@ function bwKiPruefen(anfrage) {
     required: ['befunde'],
     additionalProperties: false
   };
-  var system = 'Du bist eine sorgfältige Lektorin und achtest auf Kontinuität in einem Roman. ' +
-    'Du bekommst alles, was die Autorin zu einer Figur, einem Ort oder Gegenstand notiert hat. ' +
-    'Melde nur echte Unstimmigkeiten (Widersprüche bei Aussehen, Alter, Namen, Zeitabläufen, Orten) ' +
-    'und höchstens drei kurze Hinweise auf offensichtliche Lücken. Keine Stilkritik, keine Vorschläge zur Handlung. ' +
-    'Zitiere in „belege“ die betroffenen Stellen wörtlich und kurz, mit Kapitel. Antworte auf Deutsch. ' +
-    'Wenn alles stimmig ist, gib eine leere Liste zurück.';
+  var system = 'You are a careful editor checking continuity in a novel. ' +
+    'You get everything the author has noted about one character, place or object. ' +
+    'Report only real inconsistencies (contradictions in appearance, age, names, timelines, places) ' +
+    'and at most three short hints about obvious gaps. No style critique, no plot suggestions. ' +
+    'In "belege", quote the affected passages briefly and verbatim, with chapter. ' +
+    'Write "text" in ' + kiSprache_() + '. If everything is consistent, return an empty list.';
   var felder = Object.keys(anfrage.felder || {}).map(function (k) { return k + ': ' + anfrage.felder[k]; }).join('\n');
-  var prompt = anfrage.art + ' „' + anfrage.name + '“\n\nFelder:\n' + (felder || '(keine)') +
-    '\n\nFreitext:\n' + (anfrage.text || '(leer)') +
-    '\n\nNotizen:\n' + ((anfrage.notizen || []).map(function (n) { return '- [' + (n.kapitel || 'ohne Kapitel') + '] ' + n.text; }).join('\n') || '(keine)') +
-    '\n\nZeitstrahl:\n' + ((anfrage.ereignisse || []).map(function (z) { return '- ' + z.datum + ': ' + z.text; }).join('\n') || '(keine)');
+  var prompt = anfrage.art + ' "' + anfrage.name + '"\n\nFields:\n' + (felder || '(none)') +
+    '\n\nFree text:\n' + (anfrage.text || '(empty)') +
+    '\n\nNotes:\n' + ((anfrage.notizen || []).map(function (n) { return '- [' + (n.kapitel || 'no chapter') + '] ' + n.text; }).join('\n') || '(none)') +
+    '\n\nTimeline:\n' + ((anfrage.ereignisse || []).map(function (z) { return '- ' + z.datum + ': ' + z.text; }).join('\n') || '(none)');
   return kiAnfrage_(system, prompt, schema, 4000);
 }
 
 function kiAnfrage_(system, prompt, schema, maxTokens) {
   var key = PropertiesService.getUserProperties().getProperty(BW_PROP_KI);
-  if (!key) throw new Error('Für die KI-Hilfe fehlt noch der API-Schlüssel (Einstellungen → KI).');
+  if (!key) throw new Error(tx_('kiKeinSchluessel'));
   var modell = einstellungen_().kiModell || BW_STANDARD.kiModell;
   var body = {
     model: modell,
@@ -149,12 +160,12 @@ function kiAnfrage_(system, prompt, schema, maxTokens) {
   try { daten = JSON.parse(antwort.getContentText()); } catch (err) { daten = {}; }
   if (code !== 200) {
     var meldung = daten.error && daten.error.message ? daten.error.message : 'HTTP ' + code;
-    if (code === 401) meldung = 'Der API-Schlüssel wurde nicht akzeptiert. Bitte in den Einstellungen prüfen.';
-    if (code === 429 || code === 529) meldung = 'Die KI ist gerade ausgelastet. Bitte gleich noch einmal versuchen.';
-    throw new Error('KI: ' + meldung);
+    if (code === 401) meldung = tx_('ki401');
+    if (code === 429 || code === 529) meldung = tx_('kiAusgelastet');
+    throw new Error('✨ ' + meldung);
   }
-  if (daten.stop_reason === 'refusal') throw new Error('KI: Die Anfrage wurde abgelehnt.');
-  if (daten.stop_reason === 'max_tokens') throw new Error('KI: Die Antwort war zu lang. Bitte mit weniger Text versuchen.');
+  if (daten.stop_reason === 'refusal') throw new Error('✨ ' + tx_('kiAbgelehnt'));
+  if (daten.stop_reason === 'max_tokens') throw new Error('✨ ' + tx_('kiZuLang'));
   var text = (daten.content || []).filter(function (b) { return b.type === 'text'; }).map(function (b) { return b.text; }).join('');
   return JSON.parse(text);
 }

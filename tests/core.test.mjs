@@ -88,6 +88,27 @@ test('Datum im Buch sortierbar', () => {
   assert.ok(Core.parseDatum('3. Februar 1987', jahr) < Core.parseDatum('12. März', jahr));
 });
 
+test('Englisch: Schlüsselwörter, Daten, Titel', () => {
+  const en = [
+    { id: 'person', woerter: ['Character', 'Person'], karte: true },
+    { id: 'zeit', woerter: ['Time', 'When'], karte: false },
+    { id: 'idee', woerter: ['Idea'], karte: false }
+  ];
+  assert.equal(Core.parseNotiz('Character Lena: 34, midwife', en).name, 'Lena');
+  assert.equal(Core.parseNotiz('When March 12: Lena meets Jonas', en).name, 'March 12');
+  assert.equal(Core.parseNotiz('Time flies', en).art, 'notiz');
+  const j = 1987;
+  const w = (s) => Core.parseDatum(s, j);
+  assert.equal(w('March 12, 1987'), w('12.3.1987'));
+  assert.equal(w('12th of March'), w('12. März'));
+  assert.ok(w('February 3rd') < w('March 12'));
+  assert.ok(w('March 12 9am') < w('March 12 2:30 pm'));
+  assert.equal(w('Day 4'), 4);
+  const idx = Core.baueIndex([{ id: 'k', art: 'person', name: 'Mr. Kowalski' }, { id: 'l', art: 'person', name: 'Lena Berger' }], en);
+  assert.deepEqual(Core.findeVerweise("Lena's father met Kowalski", idx).map(v => v.text), ['Lena', 'Kowalski']);
+  assert.equal(idx.namen['Mr.'], undefined);
+});
+
 test('HTML wird sicher erzeugt', () => {
   const idx = Core.baueIndex(eintraege, arten);
   const html = Core.textMitVerweisen('<b>Lena</b>', idx, { l: eintraege[0] }, { person: arten[0] });

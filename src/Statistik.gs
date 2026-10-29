@@ -5,9 +5,9 @@
  */
 
 var BW_STATISTIK = {
-  blatt: 'Statistik',
+  blatt: { de: 'Statistik', en: 'Statistics' },
   felder: ['id', 'start', 'woerter'],
-  koepfe: ['Datum', 'Wörter am Morgen', 'Wörter zuletzt'],
+  koepfe: { de: ['Datum', 'Wörter am Morgen', 'Wörter zuletzt'], en: ['Date', 'Words in the morning', 'Words latest'] },
   breiten: [110, 140, 140]
 };
 

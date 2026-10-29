@@ -5,13 +5,20 @@
  * Aufbau: ein Zustand (S), daraus abgeleitete Verzeichnisse (berechne()),
  * und je Ansicht eine render-Funktion. Gespeichert wird sofort und ohne
  * „Speichern“-Knöpfe – oben rechts steht, ob alles gesichert ist.
+ *
+ * Alle Texte kommen aus I18n.html (t('schluessel')). Die KI ist optional:
+ * Ohne API-Schlüssel (oder wenn ausgeschaltet) taucht sie nirgends auf.
  */
 (function () {
   var C = BWCore;
+  var I = BWI18n;
+  var t = I.t;
   var h = C.escapeHtml;
+  /** Übersetzter Text, fertig maskiert für HTML. */
+  function th(schluessel, werte) { return h(t(schluessel, werte)); }
 
   var S = {
-    buch: '', tabelleUrl: '', ordnerUrl: '',
+    buch: '', tabelleUrl: '', ordnerUrl: '', kontoSprache: '', standardArten: {},
     einst: null, eintraege: [], beziehungen: [], ki: { aktiv: false },
     cursor: null, textstellen: {}, stat: null,
     ansicht: 'notizen', karteId: null, verlauf: [],
@@ -19,7 +26,7 @@
     neuIn: null, bearbeiten: null, kiVorschlag: null, kiBefunde: null, vorkommen: null,
     blaetterOffen: {}
   };
-  var D = { index: null, artVon: {}, eintragVon: {}, graph: null };
+  var D = { index: null, artVon: {}, eintragVon: {}, graph: null, jahr: 0 };
   var tmpZaehler = 0;
 
   /* -------------------------------------------------------------- */
@@ -52,18 +59,20 @@
   }
 
   function fehlertext(err) {
-    var t = (err && err.message) || String(err);
-    return t.replace(/^Exception:\s*/, '').replace(/^Error:\s*/, '');
+    var text = (err && err.message) || String(err);
+    return text.replace(/^Exception:\s*/, '').replace(/^Error:\s*/, '');
   }
 
   function zeigeStatus() {
     var el = document.getElementById('status');
     if (laufend > 0) {
-      el.textContent = 'Speichert …';
-    } else if (S.stat) {
+      el.textContent = t('status.speichert');
+    } else if (S.stat && S.einst) {
       var ziel = S.einst.tagesziel || 0;
-      el.textContent = '✍️ ' + S.stat.heute + (ziel ? ' / ' + ziel : '') + ' Wörter';
-      el.title = 'Heute geschrieben';
+      el.textContent = ziel
+        ? t('status.woerter', { n: I.zahl(S.stat.heute), ziel: I.zahl(ziel) })
+        : t('status.woerterOhneZiel', { n: I.zahl(S.stat.heute) });
+      el.title = t('status.titel');
     } else {
       el.textContent = '';
     }
@@ -83,10 +92,18 @@
   function $(sel, wurzel) { return (wurzel || document).querySelector(sel); }
   function $$(sel, wurzel) { return Array.prototype.slice.call((wurzel || document).querySelectorAll(sel)); }
 
-  function art(id) { return D.artVon[id] || C.NOTIZ_ART; }
+  function art(id) { return D.artVon[id] || notizArt(); }
+  function notizArt() { return Object.assign({}, C.NOTIZ_ART, { name: t('vorschau.notiz').replace(/^📝\s*/, '') }); }
   function istKarte(e) { return !!(e && art(e.art).karte); }
   function karten() { return S.eintraege.filter(function (e) { return istKarte(e) && e.name; }); }
   function eintrag(id) { return D.eintragVon[id]; }
+  function erstesWort(artId) {
+    var a = (S.einst.arten || []).filter(function (x) { return x.id === artId; })[0];
+    return a && a.woerter && a.woerter[0] ? a.woerter[0] : (a ? a.name : artId);
+  }
+
+  /** KI-Knöpfe nur, wenn ein Schlüssel da ist und sie nicht ausgeschaltet wurden. */
+  function kiSichtbar() { return S.ki.aktiv && S.einst.kiAnzeigen !== false; }
 
   function initialen(name) {
     var teile = String(name || '?').trim().split(/\s+/);
@@ -98,18 +115,19 @@
   function textHtml(text) { return C.textMitVerweisen(text, D.index, D.eintragVon, D.artVon); }
 
   function stelle(e) {
-    var t = e.anker ? S.textstellen[e.anker] : null;
-    return { kapitel: t ? t.kapitel : e.kapitel, pos: t ? t.pos : null, tab: t ? t.tab : (e.anker || '').split('|')[0] };
+    var s = e.anker ? S.textstellen[e.anker] : null;
+    return { kapitel: s ? s.kapitel : e.kapitel, pos: s ? s.pos : null, tab: s ? s.tab : (e.anker || '').split('|')[0] };
   }
 
   function stelleKnopf(e) {
     if (!e.anker) return '';
-    var k = stelle(e).kapitel || 'Textstelle';
-    return '<button class="stelle" data-stelle="' + h(e.id) + '" title="Zur Textstelle springen">📌 ' + h(k) + '</button>';
+    var k = stelle(e).kapitel || t('stelle');
+    return '<button class="stelle" data-stelle="' + h(e.id) + '" title="' + th('stelle.titel') + '">📌 ' + h(k) + '</button>';
   }
 
   function berechne() {
     D.artVon = C.artenMap(S.einst);
+    D.artVon.notiz = notizArt();
     D.eintragVon = {};
     S.eintraege.forEach(function (e) { D.eintragVon[e.id] = e; });
     D.index = C.baueIndex(S.eintraege, C.alleArten(S.einst));
@@ -149,7 +167,7 @@
     el.className = 'toast' + (opt.fehler ? ' fehler' : '');
     el.innerHTML = '<span>' + h(text) + '</span>' +
       (opt.aktion ? '<button data-toast="aktion">' + h(opt.aktion) + '</button>' : '') +
-      '<button data-toast="zu" title="Schließen">✕</button>';
+      '<button data-toast="zu" title="' + th('schliessen') + '">✕</button>';
     el.hidden = false;
     el.onclick = function (ev) {
       var b = ev.target.closest('[data-toast]');
@@ -162,9 +180,11 @@
     toastTimer = setTimeout(function () {
       el.hidden = true;
       if (opt.beiEnde) opt.beiEnde();
+      opt.beiEnde = null;
     }, opt.dauer || (opt.fehler ? 7000 : 4000));
   }
 
+  /** optionen: [{ html, tun }] – html ist bereits maskiert. */
   function auswahlMenue(x, y, kopf, optionen) {
     schliesseMenues();
     var m = document.createElement('div');
@@ -186,6 +206,8 @@
   function schliesseMenues() {
     $$('.auswahl-menue, .menue').forEach(function (m) { m.remove(); });
   }
+
+  function gefahr(text) { return '<span style="color:var(--gefahr)">' + h(text) + '</span>'; }
 
   /* -------------------------------------------------------------- */
   /* Speichern                                                       */
@@ -256,8 +278,8 @@
       if (S.karteId === e.id) zurueck();
       else render();
       var rueckgaengig = false;
-      toast((istKarte(e) ? '„' + e.name + '“' : art(e.art).name) + ' gelöscht', {
-        aktion: 'Rückgängig', dauer: 6000,
+      toast(t('geloescht', { name: istKarte(e) ? '„' + e.name + '“' : art(e.art).name }), {
+        aktion: t('rueckgaengig'), dauer: 6000,
         beiAktion: function () {
           rueckgaengig = true;
           S.eintraege.push(e);
@@ -275,14 +297,52 @@
     };
     if (!frage) return tun();
     auswahlMenue(window.innerWidth / 2 - 90, 120, frage, [
-      { html: '🗑️ Ja, löschen', tun: tun },
-      { html: 'Abbrechen', tun: function () {} }
+      { html: th('loeschen.ja'), tun: tun },
+      { html: th('abbrechen'), tun: function () {} }
     ]);
   }
 
   function speichereEinstellungen() {
     berechne();
     return sichere('bwEinstellungenSpeichern', S.einst);
+  }
+
+  /* -------------------------------------------------------------- */
+  /* Sprache                                                         */
+  /* -------------------------------------------------------------- */
+
+  function wendeSpracheAn() {
+    var gewaehlt = S.einst && S.einst.sprache;
+    I.setze(gewaehlt && gewaehlt !== 'auto' ? gewaehlt : I.automatisch(S.kontoSprache));
+    document.documentElement.lang = I.sprache();
+    $$('#leiste button').forEach(function (b) {
+      var k = b.dataset.nav === 'pinnwand' ? 'ideen' : b.dataset.nav === 'einstellungen' ? 'mehr' : b.dataset.nav;
+      b.lastChild.textContent = t('nav.' + k);
+      b.title = t('nav.' + k + '.titel');
+    });
+  }
+
+  /**
+   * Beim Sprachwechsel die Standard-Arten mitnehmen: Name, Schlüsselwörter und
+   * Felder werden nur ersetzt, wenn sie noch dem Standard der alten Sprache entsprechen.
+   */
+  function wechsleSprache(neu) {
+    var alt = I.sprache();
+    S.einst.sprache = neu;
+    wendeSpracheAn();
+    var vorher = S.standardArten[alt] || [], nachher = S.standardArten[I.sprache()] || [];
+    var gleich = function (a, b) { return JSON.stringify(a) === JSON.stringify(b); };
+    S.einst.arten.forEach(function (a) {
+      var v = vorher.filter(function (x) { return x.id === a.id; })[0];
+      var n = nachher.filter(function (x) { return x.id === a.id; })[0];
+      if (!v || !n) return;
+      ['name', 'mehrzahl', 'woerter', 'felder'].forEach(function (f) {
+        if (gleich(a[f], v[f])) a[f] = JSON.parse(JSON.stringify(n[f]));
+      });
+    });
+    speichereEinstellungen();
+    zeigeStatus();
+    render();
   }
 
   /* -------------------------------------------------------------- */
@@ -328,39 +388,40 @@
     var a = art(e.art);
     var abschnitte = [];
     var felder = Object.keys(e.felder || {}).filter(function (k) { return e.felder[k]; });
-    abschnitte.push({ titel: 'Steckbrief', zeilen: felder.map(function (k) { return [{ t: k + ': ', fett: true }].concat(stuecke(e.felder[k])); }) });
-    abschnitte.push({ titel: 'Beschreibung', zeilen: String(e.text || '').split('\n').filter(Boolean).map(stuecke) });
+    abschnitte.push({ titel: t('blatt.steckbrief'), zeilen: felder.map(function (k) { return [{ t: k + ': ', fett: true }].concat(stuecke(e.felder[k])); }) });
+    abschnitte.push({ titel: t('blatt.beschreibung'), zeilen: String(e.text || '').split('\n').filter(Boolean).map(stuecke) });
     abschnitte.push({
-      titel: 'Beziehungen',
+      titel: t('blatt.beziehungen'),
       zeilen: S.beziehungen.filter(function (b) { return b.von === e.id || b.nach === e.id; }).map(function (b) {
         var anderer = eintrag(b.von === e.id ? b.nach : b.von);
         if (!anderer) return [];
+        var artText = b.art || t('karte.verbundenMit');
         return b.von === e.id
-          ? [{ t: (b.art || 'verbunden mit') + ' ' }, { t: anderer.name, z: anderer.id }]
-          : [{ t: anderer.name, z: anderer.id }, { t: ' ist ' + (b.art || 'verbunden mit') + ' ' + e.name }];
+          ? [{ t: artText + ' ' }, { t: anderer.name, z: anderer.id }]
+          : [{ t: anderer.name, z: anderer.id }, { t: ' ' + t('blatt.ist', { art: artText, name: e.name }) }];
       }).filter(function (z) { return z.length; })
     });
-    var verbunden = verbundeneKarten(e.id);
     abschnitte.push({
-      titel: 'Verbunden mit',
-      zeilen: verbunden.map(function (v) { return [{ t: art(v.e.art).icon + ' ' }, { t: v.e.name, z: v.e.id }]; })
+      titel: t('blatt.verbunden'),
+      zeilen: verbundeneKarten(e.id).map(function (v) { return [{ t: art(v.e.art).icon + ' ' }, { t: v.e.name, z: v.e.id }]; })
     });
     abschnitte.push({
-      titel: 'Notizen',
+      titel: t('blatt.notizen'),
       zeilen: notizenZu(e.id).map(function (n) {
         var k = stelle(n).kapitel;
         return (k ? [{ t: k + ' – ', fett: true }] : []).concat(stuecke(n.text));
       })
     });
     abschnitte.push({
-      titel: 'Zeitstrahl',
+      titel: t('blatt.zeitstrahl'),
       zeilen: ereignisseZu(e.id).map(function (z) { return [{ t: z.name + ': ', fett: true }].concat(stuecke(z.text)); })
     });
     return {
       id: e.id,
       blattId: e.blatt,
       titel: e.name,
-      untertitel: a.name + ((e.aliase || []).length ? ' · auch: ' + e.aliase.join(', ') : ''),
+      untertitel: a.name + ((e.aliase || []).length ? ' · ' + t('blatt.auch') + ': ' + e.aliase.join(', ') : ''),
+      fusszeile: t('blatt.fuss'),
       abschnitte: abschnitte
     };
   }
@@ -421,7 +482,6 @@
     S.ansicht = ansicht;
     S.karteId = null;
     S.kiVorschlag = S.kiBefunde = S.vorkommen = null;
-    $$('#leiste button').forEach(function (b) { b.classList.toggle('aktiv', b.dataset.nav === ansicht); });
     render();
     $('#ansicht').scrollTop = 0;
     if (ansicht === 'ziel') ladeStatistik();
@@ -450,7 +510,7 @@
   function springe(e) {
     if (!e.anker) return;
     sichere('bwZuTextstelle', e.anker).then(function (ok) {
-      if (!ok) toast('Diese Textstelle gibt es nicht mehr.');
+      if (!ok) toast(t('stelle.weg'));
     });
   }
 
@@ -464,7 +524,7 @@
     $$('#leiste button').forEach(function (b) {
       b.classList.toggle('aktiv', b.dataset.nav === (S.ansicht === 'karte' ? 'welt' : S.ansicht));
     });
-    if (S.ansicht === 'notizen' && $('#neu')) {
+    if (S.ansicht === 'notizen' && $('#neu') && $('#neu').dataset.sprache === I.sprache()) {
       // Eingabefeld behalten (Fokus, Text), nur die Liste neu zeichnen.
       renderNotizListe();
       return;
@@ -485,36 +545,32 @@
 
   function renderNotizen() {
     var hilfe = S.einst.hinweisGesehen ? '' : hilfeHtml();
+    var beispiel = t('neu.beispiel', { wort: erstesWort('person') });
     return '<div class="eingabe">' +
-      '<textarea id="neu" rows="2" placeholder="Notiz schreiben …  (z. B. „Person Lena: 34, Hebamme“)" aria-label="Neue Notiz"></textarea>' +
+      '<textarea id="neu" rows="2" data-sprache="' + I.sprache() + '" placeholder="' + th('neu.platzhalter', { beispiel: beispiel }) + '" aria-label="' + th('neu.aria') + '"></textarea>' +
       '<div id="vorschlaege" class="vorschlaege" hidden></div>' +
       '<div class="eingabe-fuss">' +
       '<div class="vorschau" id="vorschau"></div>' +
-      '<button class="pin' + (S.einst.anheften ? ' an' : '') + '" id="pin" title="An die Textstelle heften, an der der Cursor steht">📌</button>' +
-      '<button class="knopf primaer klein" id="speichern" disabled>Speichern</button>' +
+      '<button class="pin' + (S.einst.anheften ? ' an' : '') + '" id="pin" title="' + th('pin.titel') + '">📌</button>' +
+      '<button class="knopf primaer klein" id="speichern" disabled>' + th('speichern') + '</button>' +
       '</div></div>' + hilfe +
       '<div class="filter">' +
-      '<button class="chip" data-filter="hier">📍 Hier</button>' +
-      '<button class="chip" data-filter="alle">Alle</button>' +
-      '<input class="suche" id="suche" type="search" placeholder="🔍 Suchen" value="' + h(S.suche) + '">' +
+      '<button class="chip" data-filter="hier">📍 ' + th('filter.hier') + '</button>' +
+      '<button class="chip" data-filter="alle">' + th('filter.alle') + '</button>' +
+      '<input class="suche" id="suche" type="search" placeholder="' + th('suchen') + '" value="' + h(S.suche) + '">' +
       '</div><div class="liste" id="liste"></div>';
   }
 
   function hilfeHtml() {
-    var a = S.einst.arten;
-    var wort = function (id) {
-      var x = a.filter(function (y) { return y.id === id; })[0];
-      return x && x.woerter[0] ? x.woerter[0] : id;
+    var zeile = function (id) {
+      return '<li><code>' + h(erstesWort(id)) + ' ' + th('hilfe.bsp.' + id) + ': …</code> ' + th('hilfe.' + id) + '</li>';
     };
-    return '<div class="hilfe" id="hilfe"><button class="mini" data-aktion="hilfe-zu" title="Ausblenden">✕</button>' +
-      '<b>So funktioniert’s:</b> Einfach drauflosschreiben. Das erste Wort entscheidet, was daraus wird:<ul>' +
-      '<li><code>' + wort('person') + ' Lena: …</code> neue Figur</li>' +
-      '<li><code>' + wort('ort') + ' Hafen: …</code> neuer Ort</li>' +
-      '<li><code>' + wort('ding') + ' Taschenuhr: …</code> Gegenstand</li>' +
-      '<li><code>' + wort('zeit') + ' 12. März: …</code> Zeitstrahl</li>' +
-      '<li><code>' + wort('idee') + ': …</code> Pinnwand</li>' +
-      '<li><code>@Lena</code> verweist auf eine Karte</li></ul>' +
-      '<div style="margin-top:6px">Bekannte Namen werden automatisch verlinkt. 📌 heftet die Notiz an die Stelle im Text, an der dein Cursor steht.</div></div>';
+    return '<div class="hilfe" id="hilfe"><button class="mini" data-aktion="hilfe-zu" title="' + th('hilfe.aus') + '">✕</button>' +
+      '<b>' + th('hilfe.titel') + '</b> ' + th('hilfe.intro') + '<ul>' +
+      zeile('person') + zeile('ort') + zeile('ding') + zeile('zeit') +
+      '<li><code>' + h(erstesWort('idee')) + ': …</code> ' + th('hilfe.idee') + '</li>' +
+      '<li><code>@Lena</code> ' + th('hilfe.at') + '</li></ul>' +
+      '<div style="margin-top:6px">' + th('hilfe.ende') + '</div></div>';
   }
 
   function renderNotizListe() {
@@ -524,14 +580,14 @@
     var hierChip = $('[data-filter="hier"]');
     if (hierChip) {
       var k = S.cursor && S.cursor.kapitel;
-      hierChip.textContent = '📍 ' + (k ? C.ausschnitt(k, 22) : 'Hier');
-      hierChip.title = 'Notizen zum Kapitel, in dem der Cursor steht';
+      hierChip.textContent = '📍 ' + (k ? C.ausschnitt(k, 22) : t('filter.hier'));
+      hierChip.title = t('filter.hier.titel');
     }
     var eintraege = S.eintraege.slice();
     var leerText = '';
     if (S.filter === 'hier') {
       if (!S.cursor) {
-        liste.innerHTML = '<div class="leer"><div class="gross">👆</div>Klicke in deinen Text – dann erscheinen hier die Notizen zu diesem Kapitel.</div>';
+        liste.innerHTML = '<div class="leer"><div class="gross">👆</div>' + th('liste.klick') + '</div>';
         return;
       }
       eintraege = eintraege.filter(function (e) {
@@ -539,17 +595,17 @@
         var s = stelle(e);
         return e.provisorisch || (s.kapitel === S.cursor.kapitel && (!S.cursor.tab || !s.tab || s.tab === S.cursor.tab));
       }).sort(nachStelle);
-      leerText = 'Zu ' + (S.cursor.kapitel ? '„' + h(S.cursor.kapitel) + '“' : 'dieser Stelle') + ' gibt es noch keine Notizen.';
+      leerText = S.cursor.kapitel ? th('liste.leerHier', { kapitel: S.cursor.kapitel }) : th('liste.leerStelle');
     } else {
       eintraege.sort(function (a, b) { return String(b.erstellt).localeCompare(String(a.erstellt)); });
-      leerText = 'Noch keine Notizen. Schreib oben einfach los!';
+      leerText = th('liste.leer');
     }
     if (S.suche) {
       var q = S.suche.toLowerCase();
       eintraege = eintraege.filter(function (e) {
         return (e.name + ' ' + e.text + ' ' + (e.aliase || []).join(' ') + ' ' + e.kapitel).toLowerCase().indexOf(q) >= 0;
       });
-      leerText = 'Nichts gefunden für „' + h(S.suche) + '“.';
+      leerText = th('liste.nichts', { q: S.suche });
     }
     if (!eintraege.length) {
       liste.innerHTML = '<div class="leer"><div class="gross">🗒️</div>' + leerText + '</div>';
@@ -557,6 +613,12 @@
     }
     liste.innerHTML = eintraege.map(notizHtml).join('');
     $$('textarea[data-auto]', liste).forEach(autoHoehe);
+  }
+
+  function bearbeitenHtml(e) {
+    return '<textarea data-auto data-bearbeiten="' + h(e.id) + '">' + h(alsEingabe(e)) + '</textarea>' +
+      '<div class="ki-leiste"><button class="knopf primaer klein" data-aktion="bearbeiten-ok" data-id="' + h(e.id) + '">' + th('fertig') + '</button>' +
+      '<button class="knopf klein" data-aktion="bearbeiten-abbruch">' + th('abbrechen') + '</button></div>';
   }
 
   function notizHtml(e) {
@@ -568,26 +630,23 @@
     } else if (e.name) {
       kopf += '<span class="titel">' + h(e.name) + '</span>';
     }
-    if (e.art === 'idee' && e.status && e.status !== 'offen') kopf += '<span>· ' + h(e.status) + '</span>';
+    if (e.art === 'idee' && e.status && e.status !== 'offen') kopf += '<span>· ' + th('idee.status.' + e.status) + '</span>';
     var inhalt;
     if (S.bearbeiten === e.id) {
-      inhalt = '<textarea data-auto data-bearbeiten="' + h(e.id) + '">' + h(alsEingabe(e)) + '</textarea>' +
-        '<div class="ki-leiste"><button class="knopf primaer klein" data-aktion="bearbeiten-ok" data-id="' + h(e.id) + '">Fertig</button>' +
-        '<button class="knopf klein" data-aktion="bearbeiten-abbruch">Abbrechen</button></div>';
+      inhalt = bearbeitenHtml(e);
     } else {
       var text = istKarte(e) ? C.ausschnitt(e.text, 160) : e.text;
       inhalt = '<div class="notiz-text">' + (text ? textHtml(text) : '<span style="color:var(--text-3)">–</span>') + '</div>';
     }
     return '<div class="notiz' + (hier ? ' hier' : '') + (e.provisorisch ? ' provisorisch' : '') + '" style="' + stilFarbe(a) + '" data-eintrag="' + h(e.id) + '">' +
       '<div class="notiz-kopf">' + kopf + '<span class="rechts">' + stelleKnopf(e) +
-      '<button class="mini" data-menue="' + h(e.id) + '" title="Mehr">⋯</button></span></div>' + inhalt + '</div>';
+      '<button class="mini" data-menue="' + h(e.id) + '" title="' + th('mehr') + '">⋯</button></span></div>' + inhalt + '</div>';
   }
 
   /** So sieht ein Eintrag als Eingabetext aus (zum Bearbeiten). */
   function alsEingabe(e) {
     if (e.art === 'notiz') return e.text;
-    var w = (art(e.art).woerter || [])[0] || art(e.art).name;
-    return w + (e.name ? ' ' + e.name : '') + ': ' + e.text;
+    return erstesWort(e.art) + (e.name ? ' ' + e.name : '') + ': ' + e.text;
   }
 
   function notizMenue(id, knopf) {
@@ -595,27 +654,27 @@
     if (!e) return;
     var r = knopf.getBoundingClientRect();
     var optionen = [];
-    if (istKarte(e)) optionen.push({ html: '🗂️ Karte öffnen', tun: function () { oeffneKarte(id); } });
-    else optionen.push({ html: '✏️ Bearbeiten', tun: function () { S.bearbeiten = id; render(); var t = $('[data-bearbeiten]'); if (t) { t.focus(); t.selectionStart = t.value.length; } } });
-    if (e.anker) optionen.push({ html: '📌 Zur Textstelle', tun: function () { springe(e); } });
-    else optionen.push({ html: '📌 An Cursor-Stelle heften', tun: function () { speichere(e, { anheften: true }).then(render); } });
+    if (istKarte(e)) optionen.push({ html: th('menue.karte'), tun: function () { oeffneKarte(id); } });
+    else optionen.push({ html: th('menue.bearbeiten'), tun: function () { S.bearbeiten = id; render(); var ta = $('[data-bearbeiten]'); if (ta) { ta.focus(); ta.selectionStart = ta.value.length; } } });
+    if (e.anker) optionen.push({ html: th('menue.stelle'), tun: function () { springe(e); } });
+    else optionen.push({ html: th('menue.anheften'), tun: function () { speichere(e, { anheften: true }).then(render); } });
     if (e.art === 'notiz') {
-      optionen.push({ html: '💡 Zur Pinnwand (als Idee)', tun: function () { e.art = 'idee'; e.status = 'offen'; speichere(e).then(render); render(); } });
+      optionen.push({ html: th('menue.pinnwand'), tun: function () { e.art = 'idee'; e.status = 'offen'; speichere(e).then(render); render(); } });
     }
-    optionen.push({ html: '<span style="color:var(--gefahr)">🗑️ Löschen</span>', tun: function () {
-      loesche(e, istKarte(e) ? '„' + e.name + '“ wirklich löschen? Notizen bleiben erhalten.' : null);
+    optionen.push({ html: gefahr(t('menue.loeschen')), tun: function () {
+      loesche(e, istKarte(e) ? t('loeschen.frage', { name: e.name }) : null);
     } });
     auswahlMenue(r.right - 180, r.bottom + 2, null, optionen);
   }
 
   function bearbeitenFertig(id) {
     var e = eintrag(id);
-    var t = $('[data-bearbeiten="' + id + '"]');
-    if (!e || !t) return;
-    var p = C.parseNotiz(t.value, C.alleArten(S.einst));
+    var ta = $('[data-bearbeiten="' + id + '"]');
+    if (!e || !ta) return;
+    var p = C.parseNotiz(ta.value, C.alleArten(S.einst));
     if (art(p.art).karte) {
       // Aus einer Notiz wird hier keine Karte – der Text bleibt, wie er ist.
-      p = { art: e.art === 'notiz' ? 'notiz' : e.art, name: e.art === 'notiz' ? '' : e.name, text: t.value.trim() };
+      p = { art: e.art === 'notiz' ? 'notiz' : e.art, name: e.art === 'notiz' ? '' : e.name, text: ta.value.trim() };
     }
     var vorher = verweiseVon(e);
     e.art = p.art;
@@ -651,7 +710,7 @@
       this.classList.toggle('an', S.einst.anheften);
       aktualisiereVorschau();
       speichereEinstellungen();
-      toast(S.einst.anheften ? '📌 Neue Notizen werden an die Cursor-Stelle geheftet.' : 'Neue Notizen werden nicht angeheftet.');
+      toast(t(S.einst.anheften ? 'pin.an' : 'pin.aus'));
     };
     $('#suche').addEventListener('input', function () {
       S.suche = this.value.trim();
@@ -665,31 +724,36 @@
     var text = ta.value;
     $('#speichern').disabled = !text.trim();
     if (!text.trim()) {
-      el.innerHTML = S.cursor && S.einst.anheften && S.cursor.kapitel ? '📌 wird angeheftet an <b>' + h(C.ausschnitt(S.cursor.kapitel, 26)) + '</b>' : '<span>⏎ speichert · ⇧⏎ neue Zeile</span>';
+      el.innerHTML = S.cursor && S.einst.anheften && S.cursor.kapitel
+        ? th('vorschau.angeheftet', { kapitel: '' }) + '<b>' + h(C.ausschnitt(S.cursor.kapitel, 26)) + '</b>'
+        : '<span>' + th('vorschau.tipp') + '</span>';
       return;
     }
     var p = C.parseNotiz(text, C.alleArten(S.einst));
     var a = art(p.art);
     var html;
     if (a.karte) {
-      if (!p.name) html = a.icon + ' ' + h(a.name) + ' – <b>Name fehlt</b>';
+      if (!p.name) html = a.icon + ' ' + h(a.name) + ' – <b>' + th('vorschau.nameFehlt') + '</b>';
       else {
         var da = finde(p.art, p.name);
-        html = da ? '📝 Notiz zu ' + a.icon + ' <b>' + h(da.name) + '</b>' : a.icon + ' Neue Karte: <b>' + h(p.name) + '</b>';
+        html = da
+          ? th('vorschau.notizZu') + ' ' + a.icon + ' <b>' + h(da.name) + '</b>'
+          : a.icon + ' ' + th('vorschau.neueKarte') + ' <b>' + h(p.name) + '</b>';
       }
     } else if (p.art === 'zeit') {
-      html = '📅 Ereignis am <b>' + h(p.name) + '</b>' + (C.parseDatum(p.name) == null ? ' <span title="Wird ans Ende des Zeitstrahls sortiert">(Datum?)</span>' : '');
+      html = th('vorschau.ereignis') + ' <b>' + h(p.name) + '</b>' +
+        (C.parseDatum(p.name, D.jahr) == null ? ' <span title="' + th('vorschau.datum.titel') + '">' + th('vorschau.datum') + '</span>' : '');
     } else if (p.art === 'idee') {
-      html = '💡 Idee für die Pinnwand';
+      html = th('vorschau.idee');
     } else if (a.id !== 'notiz') {
       html = a.icon + ' ' + h(a.name);
     } else {
       var namen = [];
       C.findeVerweise(text, D.index).forEach(function (v) {
-        var n = v.neu ? '@' + v.text + ' (neu)' : eintrag(v.ids[0]).name;
+        var n = v.neu ? '@' + v.text + ' ' + t('vorschau.neu') : eintrag(v.ids[0]).name;
         if (namen.indexOf(n) < 0) namen.push(n);
       });
-      html = '📝 Notiz' + (namen.length ? ' zu <b>' + h(namen.slice(0, 3).join(', ')) + '</b>' + (namen.length > 3 ? ' …' : '') : '');
+      html = th('vorschau.notiz') + (namen.length ? ' ' + th('vorschau.zu') + ' <b>' + h(namen.slice(0, 3).join(', ')) + '</b>' + (namen.length > 3 ? ' …' : '') : '');
     }
     el.innerHTML = html;
   }
@@ -723,7 +787,7 @@
         (a.woerter || []).forEach(function (wort) {
           if (wort.toLowerCase().indexOf(w) === 0 && wort.toLowerCase() !== w) {
             vorschlagListe.push({
-              html: a.icon + ' <b>' + h(wort) + '</b> <small>' + (a.karte ? 'neue Karte' : h(a.name)) + '</small>',
+              html: a.icon + ' <b>' + h(wort) + '</b> <small>' + (a.karte ? th('vorschlag.neueKarte') : h(a.name)) + '</small>',
               einfuegen: function () { ersetzeVorCursor(vor.length, wort + (a.karte || a.id === 'zeit' ? ' ' : ': ')); }
             });
           }
@@ -731,14 +795,14 @@
       });
     } else if (m3) {
       var a3 = C.alleArten(S.einst).filter(function (a) {
-        return a.karte && (a.woerter || []).some(function (w) { return w.toLowerCase() === m3[1].toLowerCase(); });
+        return a.karte && (a.woerter || []).some(function (x) { return x.toLowerCase() === m3[1].toLowerCase(); });
       })[0];
       if (a3) {
         var q3 = m3[2].toLowerCase();
         karten().filter(function (e) { return e.art === a3.id && e.name.toLowerCase().indexOf(q3) === 0 && e.name.toLowerCase() !== q3.trim(); })
           .forEach(function (e) {
             vorschlagListe.push({
-              html: a3.icon + ' ' + h(e.name) + ' <small>Notiz dazu</small>',
+              html: a3.icon + ' ' + h(e.name) + ' <small>' + th('vorschlag.notizDazu') + '</small>',
               einfuegen: function () { ersetzeVorCursor(m3[2].length, e.name + ': '); }
             });
           });
@@ -807,7 +871,7 @@
     var neu, nachher = null;
     if (a.karte) {
       if (!p.name) {
-        toast('Bitte einen Namen angeben, z. B. „' + a.woerter[0] + ' Lena: …“');
+        toast(t('name.angeben', { wort: erstesWort(a.id) }));
         return;
       }
       var da = finde(p.art, p.name);
@@ -821,7 +885,7 @@
       } else {
         neu = { art: p.art, name: p.name, text: p.text, aliase: [], felder: {} };
         nachher = function (e) {
-          toast(a.icon + ' „' + e.name + '“ angelegt', { aktion: 'Karte öffnen', beiAktion: function () { oeffneKarte(e.id); } });
+          toast(t('angelegt', { icon: a.icon, name: e.name }), { aktion: t('karte.oeffnen'), beiAktion: function () { oeffneKarte(e.id); } });
         };
       }
     } else if (p.art === 'idee') {
@@ -854,8 +918,8 @@
   function frageNachUnbekannten(e) {
     var neu = C.findeVerweise(e.text, D.index).filter(function (v) { return v.neu; });
     if (!neu.length) return;
-    toast('„' + neu[0].text + '“ gibt es noch nicht.', {
-      aktion: 'Anlegen …', dauer: 7000,
+    toast(t('unbekannt', { name: neu[0].text }), {
+      aktion: t('unbekannt.anlegen'), dauer: 7000,
       beiAktion: function () { neuAnlegenMenue(neu[0].text, window.innerWidth / 2 - 90, window.innerHeight - 200); }
     });
   }
@@ -863,17 +927,17 @@
   function neuAnlegenMenue(name, x, y) {
     var optionen = S.einst.arten.filter(function (a) { return a.karte; }).map(function (a) {
       return {
-        html: a.icon + ' Als ' + h(a.name) + ' anlegen',
+        html: a.icon + ' ' + th('anlegen.als', { art: a.name }),
         tun: function () {
           speichere({ art: a.id, name: name, text: '', aliase: [], felder: {} }).then(function (e) {
             render();
-            toast(a.icon + ' „' + e.name + '“ angelegt', { aktion: 'Karte öffnen', beiAktion: function () { oeffneKarte(e.id); } });
+            toast(t('angelegt', { icon: a.icon, name: e.name }), { aktion: t('karte.oeffnen'), beiAktion: function () { oeffneKarte(e.id); } });
           });
           render();
         }
       };
     });
-    auswahlMenue(x, y, '„' + name + '“ ist neu', optionen);
+    auswahlMenue(x, y, t('unbekannt.istNeu', { name: name }), optionen);
   }
 
   /* -------------------------------------------------------------- */
@@ -882,21 +946,21 @@
 
   function renderWelt() {
     var q = S.weltSuche.toLowerCase();
-    var html = '<div class="filter"><input class="suche" id="weltsuche" type="search" placeholder="🔍 Figuren, Orte, Gegenstände suchen" value="' + h(S.weltSuche) + '"></div>';
+    var html = '<div class="filter"><input class="suche" id="weltsuche" type="search" placeholder="' + th('welt.suche') + '" value="' + h(S.weltSuche) + '"></div>';
     S.einst.arten.filter(function (a) { return a.karte; }).forEach(function (a) {
       var liste = karten().filter(function (e) {
         if (e.art !== a.id) return false;
         if (!q) return true;
         return (e.name + ' ' + (e.aliase || []).join(' ') + ' ' + e.text).toLowerCase().indexOf(q) >= 0;
-      }).sort(function (x, y) { return x.name.localeCompare(y.name, 'de'); });
+      }).sort(function (x, y) { return x.name.localeCompare(y.name, I.locale()); });
       if (q && !liste.length) return;
       html += '<div class="gruppe"><div class="gruppe-kopf">' + a.icon + ' ' + h(a.mehrzahl || a.name) + ' <span class="zahl">' + liste.length + '</span>' +
-        '<button class="knopf klein" data-aktion="neu-karte" data-art="' + a.id + '">＋ Neu</button></div>';
+        '<button class="knopf klein" data-aktion="neu-karte" data-art="' + a.id + '">' + th('welt.neu') + '</button></div>';
       if (S.neuIn === a.id) {
-        html += '<div class="neu-zeile"><input id="neu-name" placeholder="Name der/des neuen ' + h(a.name) + '"><button class="knopf primaer klein" data-aktion="neu-karte-ok" data-art="' + a.id + '">Anlegen</button></div>';
+        html += '<div class="neu-zeile"><input id="neu-name" placeholder="' + th('welt.name', { art: a.name }) + '"><button class="knopf primaer klein" data-aktion="neu-karte-ok" data-art="' + a.id + '">' + th('welt.anlegen') + '</button></div>';
       }
       if (!liste.length && S.neuIn !== a.id) {
-        html += '<div class="unter" style="padding:0 2px 6px">Noch leer. Im Notizfeld: <b>' + h(a.woerter[0] || a.name) + ' Name: …</b></div>';
+        html += '<div class="unter" style="padding:0 2px 6px">' + th('welt.leer') + ' <b>' + h(erstesWort(a.id)) + ' Name: …</b></div>';
       }
       html += liste.map(function (e) { return karteZeile(e, a); }).join('') + '</div>';
     });
@@ -911,7 +975,7 @@
       '<span class="avatar">' + initialen(e.name) + '</span>' +
       '<span class="zeile-text"><div class="zeile-name">' + h(e.name) + '</div>' +
       '<div class="zeile-info">' + h(C.ausschnitt(info, 80)) + '</div></span>' +
-      (n ? '<span class="zahl" title="Erwähnungen in Notizen und Karten">' + n + '×</span>' : '') + '</button>';
+      (n ? '<span class="zahl" title="' + th('welt.erwaehnt') + '">' + n + '×</span>' : '') + '</button>';
   }
 
   function neueKarteAnlegen(artId) {
@@ -935,12 +999,12 @@
     if (!e) return '';
     var a = art(e.art);
     var html = '<div style="display:flex;align-items:center;position:relative">' +
-      '<button class="zurueck" data-aktion="zurueck">← Zurück</button><span style="flex:1"></span>' +
-      '<span id="kopfmenue"></span><button class="mini" data-aktion="karten-menue" title="Mehr" style="font-size:16px">⋯</button></div>';
+      '<button class="zurueck" data-aktion="zurueck">' + th('karte.zurueck') + '</button><span style="flex:1"></span>' +
+      '<span id="kopfmenue"></span><button class="mini" data-aktion="karten-menue" title="' + th('mehr') + '" style="font-size:16px">⋯</button></div>';
     html += '<div class="karte-kopf" style="' + stilFarbe(a) + '"><span class="avatar">' + initialen(e.name) + '</span><div style="flex:1;min-width:0">' +
       '<div class="karte-art">' + a.icon + ' ' + h(a.name) + '</div>' +
-      '<input class="karte-name" data-feld="name" value="' + h(e.name) + '" aria-label="Name">' +
-      '<input class="feld-alias" data-feld="aliase" value="' + h((e.aliase || []).join(', ')) + '" placeholder="Auch genannt: Spitzname, „der Vater“ …" title="Weitere Namen, durch Komma getrennt. Auch sie werden im Text erkannt.">' +
+      '<input class="karte-name" data-feld="name" value="' + h(e.name) + '" aria-label="' + th('karte.name') + '">' +
+      '<input class="feld-alias" data-feld="aliase" value="' + h((e.aliase || []).join(', ')) + '" placeholder="' + th('karte.alias') + '" title="' + th('karte.alias.titel') + '">' +
       '</div></div>';
 
     if (S.kiVorschlag && S.kiVorschlag.id === e.id) html += kiVorschlagHtml(e);
@@ -950,63 +1014,65 @@
     var felder = (a.felder || []).slice();
     Object.keys(e.felder || {}).forEach(function (k) { if (felder.indexOf(k) < 0) felder.push(k); });
     if (felder.length) {
-      html += '<div class="block"><div class="block-titel">Steckbrief</div><div class="felder">' +
+      html += '<div class="block"><div class="block-titel">' + th('karte.steckbrief') + '</div><div class="felder">' +
         felder.map(function (f) {
           return '<label>' + h(f) + '</label><textarea data-auto rows="1" data-steckbrief="' + h(f) + '" placeholder="–">' + h((e.felder || {})[f] || '') + '</textarea>';
         }).join('') + '</div></div>';
     }
 
-    // Freitext
-    html += '<div class="block"><div class="block-titel">Beschreibung</div>' +
-      '<div class="freitext-ansicht' + (e.text ? '' : ' leer-text') + '" data-aktion="freitext" title="Klicken zum Bearbeiten">' +
-      (e.text ? textHtml(e.text) : 'Hier frei über ' + h(e.name) + ' schreiben – Aussehen, Geschichte, Eigenheiten …') + '</div>' +
-      '<div class="ki-leiste"><button class="knopf ki klein" data-aktion="ki-felder" title="Die KI liest Beschreibung und alle Notizen und füllt den Steckbrief aus">✨ Steckbrief ausfüllen</button>' +
-      '<button class="knopf ki klein" data-aktion="ki-pruefen" title="Die KI sucht nach Widersprüchen in allem, was zu dieser Karte notiert ist">🔍 Widersprüche prüfen</button></div></div>';
+    // Freitext (+ KI, falls eingeschaltet)
+    html += '<div class="block"><div class="block-titel">' + th('karte.beschreibung') + '</div>' +
+      '<div class="freitext-ansicht' + (e.text ? '' : ' leer-text') + '" data-aktion="freitext" title="' + th('karte.bearbeiten') + '">' +
+      (e.text ? textHtml(e.text) : th('karte.freitextLeer', { name: e.name })) + '</div>' +
+      (kiSichtbar()
+        ? '<div class="ki-leiste"><button class="knopf ki klein" data-aktion="ki-felder" title="' + th('ki.felder.titel') + '">' + th('ki.felder') + '</button>' +
+          '<button class="knopf ki klein" data-aktion="ki-pruefen" title="' + th('ki.pruefen.titel') + '">' + th('ki.pruefen') + '</button></div>'
+        : '') + '</div>';
 
     // Beziehungen
     var bez = S.beziehungen.filter(function (b) { return b.von === e.id || b.nach === e.id; });
-    html += '<div class="block"><div class="block-titel">Beziehungen</div>' +
+    html += '<div class="block"><div class="block-titel">' + th('karte.beziehungen') + '</div>' +
       (bez.length ? bez.map(function (b) {
         var anderer = eintrag(b.von === e.id ? b.nach : b.von);
         if (!anderer) return '';
+        var artText = b.art || t('karte.verbundenMit');
         var ref = '<button class="ref" data-id="' + h(anderer.id) + '" style="--c:' + art(anderer.art).farbe + '">' + h(anderer.name) + '</button>';
         return '<div class="bez">' + (b.von === e.id
-          ? '<span class="art-text">' + h(b.art || 'verbunden mit') + '</span> ' + ref
-          : ref + ' <span class="art-text">ist ' + h(b.art || 'verbunden mit') + ' ' + h(e.name) + '</span>') +
-          '<button class="mini" data-aktion="bez-loeschen" data-bez="' + h(b.id) + '" title="Beziehung entfernen">✕</button></div>';
-      }).join('') : '<div class="unter" style="margin-top:0">Noch keine. Z. B. „Tochter von“ Heinrich.</div>') +
-      '<div class="bez-neu"><input id="bez-art" list="bez-arten" placeholder="z. B. Tochter von">' +
-      '<select id="bez-ziel"><option value="">… wem?</option>' + karten().filter(function (k) { return k.id !== e.id; })
-        .sort(function (x, y) { return x.name.localeCompare(y.name, 'de'); })
+          ? '<span class="art-text">' + h(artText) + '</span> ' + ref
+          : ref + ' <span class="art-text">' + th('karte.ist', { art: artText, name: e.name }) + '</span>') +
+          '<button class="mini" data-aktion="bez-loeschen" data-bez="' + h(b.id) + '" title="' + th('karte.bezWeg') + '">✕</button></div>';
+      }).join('') : '<div class="unter" style="margin-top:0">' + th('karte.bezLeer') + '</div>') +
+      '<div class="bez-neu"><input id="bez-art" list="bez-arten" placeholder="' + th('karte.bezPlatz') + '">' +
+      '<select id="bez-ziel"><option value="">' + th('karte.wem') + '</option>' + karten().filter(function (k) { return k.id !== e.id; })
+        .sort(function (x, y) { return x.name.localeCompare(y.name, I.locale()); })
         .map(function (k) { return '<option value="' + h(k.id) + '">' + art(k.art).icon + ' ' + h(k.name) + '</option>'; }).join('') + '</select>' +
       '<button class="knopf klein" data-aktion="bez-neu">＋</button></div>' +
-      '<datalist id="bez-arten">' + ['Tochter von', 'Sohn von', 'Mutter von', 'Vater von', 'Schwester von', 'Bruder von', 'verheiratet mit', 'befreundet mit', 'verliebt in', 'Feind von', 'arbeitet für', 'wohnt in', 'gehört', 'besitzt', 'liegt in']
-        .map(function (x) { return '<option value="' + x + '">'; }).join('') + '</datalist></div>';
+      '<datalist id="bez-arten">' + t('karte.bezArten').map(function (x) { return '<option value="' + h(x) + '">'; }).join('') + '</datalist></div>';
 
     // Automatisch verbunden
     var verbunden = verbundeneKarten(e.id);
     if (verbunden.length) {
-      html += '<div class="block"><div class="block-titel">Verbunden mit</div><div class="verbunden">' +
+      html += '<div class="block"><div class="block-titel">' + th('karte.verbunden') + '</div><div class="verbunden">' +
         verbunden.map(function (v) {
           return '<button class="ref" data-id="' + h(v.e.id) + '" style="--c:' + art(v.e.art).farbe + '">' + art(v.e.art).icon + ' ' + h(v.e.name) + '</button>';
         }).join('') + '</div></div>';
     }
 
     // Vorkommen im Manuskript
-    html += '<div class="block"><div class="block-titel">Im Manuskript<span class="rechts"><button class="link" data-aktion="vorkommen">' +
-      (S.vorkommen && S.vorkommen.id === e.id ? 'aktualisieren' : 'Wo kommt ' + h(C.ausschnitt(e.name, 18)) + ' vor?') + '</button></span></div>' +
+    html += '<div class="block"><div class="block-titel">' + th('karte.manuskript') + '<span class="rechts"><button class="link" data-aktion="vorkommen">' +
+      (S.vorkommen && S.vorkommen.id === e.id ? th('karte.aktualisieren') : th('karte.woVor', { name: C.ausschnitt(e.name, 18) })) + '</button></span></div>' +
       vorkommenHtml(e) + '</div>';
 
     // Notizen
     var notizen = notizenZu(e.id);
-    html += '<div class="block"><div class="block-titel">Notizen <span style="font-weight:400">' + notizen.length + '</span>' +
-      '<span class="rechts"><button class="link" data-aktion="notiz-zu">＋ Notiz</button></span></div>' +
-      (notizen.length ? '<div class="liste">' + notizen.map(notizHtml).join('') + '</div>' : '<div class="unter" style="margin-top:0">Erwähne ' + h(e.name) + ' in einer Notiz, dann erscheint sie hier.</div>') + '</div>';
+    html += '<div class="block"><div class="block-titel">' + th('karte.notizen') + ' <span style="font-weight:400">' + notizen.length + '</span>' +
+      '<span class="rechts"><button class="link" data-aktion="notiz-zu">' + th('karte.plusNotiz') + '</button></span></div>' +
+      (notizen.length ? '<div class="liste">' + notizen.map(notizHtml).join('') + '</div>' : '<div class="unter" style="margin-top:0">' + th('karte.notizenLeer', { name: e.name }) + '</div>') + '</div>';
 
     // Zeitstrahl
     var ereignisse = ereignisseZu(e.id);
     if (ereignisse.length) {
-      html += '<div class="block"><div class="block-titel">Zeitstrahl</div><div class="zeitstrahl">' + ereignisse.map(ereignisHtml).join('') + '</div></div>';
+      html += '<div class="block"><div class="block-titel">' + th('karte.zeitstrahl') + '</div><div class="zeitstrahl">' + ereignisse.map(ereignisHtml).join('') + '</div></div>';
     }
     return html;
   }
@@ -1015,62 +1081,62 @@
     var el = $('#kopfmenue');
     var e = eintrag(S.karteId);
     if (!el || !e) return;
-    el.innerHTML = e.blatt ? '<a class="link" style="font-size:12px;text-decoration:none;margin-right:6px" target="_blank" href="https://docs.google.com/document/d/' + h(e.blatt) + '/edit" title="Personenblatt als Google Doc – auch am Handy mit @' + h(e.name) + ' erreichbar">📄 Blatt</a>' : '';
+    el.innerHTML = e.blatt ? '<a class="link" style="font-size:12px;text-decoration:none;margin-right:6px" target="_blank" href="https://docs.google.com/document/d/' + h(e.blatt) + '/edit" title="' + th('karte.blatt.titel', { name: e.name }) + '">' + th('karte.blatt') + '</a>' : '';
   }
 
   function vorkommenHtml(e) {
-    if (!S.vorkommen || S.vorkommen.id !== e.id) return '<div class="unter" style="margin-top:0">Zählt, in welchen Kapiteln ' + h(e.name) + ' (oder ein anderer Name dafür) vorkommt.</div>';
-    if (S.vorkommen.laedt) return '<div class="unter" style="margin-top:0">Suche im Manuskript …</div>';
+    var info = function (text) { return '<div class="unter" style="margin-top:0">' + text + '</div>'; };
+    if (!S.vorkommen || S.vorkommen.id !== e.id) return info(th('karte.vorkommenInfo', { name: e.name }));
+    if (S.vorkommen.laedt) return info(th('karte.sucht'));
     var liste = S.vorkommen.liste;
-    if (!liste.length) return '<div class="unter" style="margin-top:0">Im Manuskript noch nicht gefunden.</div>';
+    if (!liste.length) return info(th('karte.nichtGefunden'));
     var gesamt = liste.reduce(function (s, k) { return s + k.anzahl; }, 0);
-    return '<div class="unter" style="margin-top:0">' + gesamt + '× in ' + liste.length + ' ' + (liste.length === 1 ? 'Abschnitt' : 'Abschnitten') + '</div>' +
+    return info(th(liste.length === 1 ? 'karte.vorkommen1' : 'karte.vorkommenN', { n: gesamt, k: liste.length })) +
       liste.map(function (k, i) {
-        return '<div class="bez"><button class="stelle" style="max-width:none" data-aktion="zu-absatz" data-i="' + i + '">📖 ' + h(k.kapitel || 'Anfang') + '</button><span class="art-text" style="margin-left:auto">' + k.anzahl + '×</span></div>';
+        return '<div class="bez"><button class="stelle" style="max-width:none" data-aktion="zu-absatz" data-i="' + i + '">📖 ' + h(k.kapitel || t('anfang')) + '</button><span class="art-text" style="margin-left:auto">' + k.anzahl + '×</span></div>';
       }).join('');
   }
 
   function kiVorschlagHtml(e) {
     var v = S.kiVorschlag;
-    if (v.laedt) return '<div class="vorschlag-box"><h4>✨ Die KI liest alles über ' + h(e.name) + ' …</h4><div class="kreisel"></div></div>';
+    if (v.laedt) return '<div class="vorschlag-box"><h4>' + th('ki.liest', { name: e.name }) + '</h4><div class="kreisel"></div></div>';
     var zeilen = '';
-    Object.keys(v.felder).forEach(function (f, i) {
+    Object.keys(v.felder).forEach(function (f) {
       var neu = v.felder[f], alt = (e.felder || {})[f] || '';
       if (!neu || neu === alt) return;
       zeilen += '<label class="vorschlag-feld"><input type="checkbox" data-vf="' + h(f) + '" checked><span><b>' + h(f) + '</b><br>' +
         (alt ? '<span class="alt">' + h(alt) + '</span><br>' : '') + h(neu) + '</span></label>';
     });
-    var neueAliase = (v.aliase || []).filter(function (x) {
+    (v.aliase || []).filter(function (x) {
       return x && x !== e.name && (e.aliase || []).indexOf(x) < 0;
-    });
-    neueAliase.forEach(function (x) {
-      zeilen += '<label class="vorschlag-feld"><input type="checkbox" data-va="' + h(x) + '" checked><span><b>Auch genannt</b><br>' + h(x) + '</span></label>';
+    }).forEach(function (x) {
+      zeilen += '<label class="vorschlag-feld"><input type="checkbox" data-va="' + h(x) + '" checked><span><b>' + th('ki.auchGenannt') + '</b><br>' + h(x) + '</span></label>';
     });
     (v.beziehungen || []).forEach(function (b, i) {
       var ziel = finde(null, b.name);
       if (!ziel || ziel.id === e.id) return;
       var schonDa = S.beziehungen.some(function (x) { return x.von === e.id && x.nach === ziel.id; });
       if (schonDa) return;
-      zeilen += '<label class="vorschlag-feld"><input type="checkbox" data-vb="' + i + '" checked><span><b>Beziehung</b><br>' + h(b.art) + ' ' + art(ziel.art).icon + ' ' + h(ziel.name) + '</span></label>';
+      zeilen += '<label class="vorschlag-feld"><input type="checkbox" data-vb="' + i + '" checked><span><b>' + th('ki.beziehung') + '</b><br>' + h(b.art) + ' ' + art(ziel.art).icon + ' ' + h(ziel.name) + '</span></label>';
     });
     if (!zeilen) {
-      return '<div class="vorschlag-box"><h4>✨ Nichts Neues gefunden</h4><div class="unter">Der Steckbrief passt schon zu Beschreibung und Notizen.</div>' +
-        '<div class="ki-leiste"><button class="knopf klein" data-aktion="ki-zu">OK</button></div></div>';
+      return '<div class="vorschlag-box"><h4>' + th('ki.nichtsNeu') + '</h4><div class="unter">' + th('ki.passt') + '</div>' +
+        '<div class="ki-leiste"><button class="knopf klein" data-aktion="ki-zu">' + th('ok') + '</button></div></div>';
     }
-    return '<div class="vorschlag-box"><h4>✨ Vorschlag der KI</h4><div class="unter" style="margin-top:0">Häkchen weg bei allem, was nicht stimmt.</div>' + zeilen +
-      '<div class="ki-leiste"><button class="knopf primaer klein" data-aktion="ki-uebernehmen">Übernehmen</button><button class="knopf klein" data-aktion="ki-zu">Verwerfen</button></div></div>';
+    return '<div class="vorschlag-box"><h4>' + th('ki.vorschlag') + '</h4><div class="unter" style="margin-top:0">' + th('ki.haken') + '</div>' + zeilen +
+      '<div class="ki-leiste"><button class="knopf primaer klein" data-aktion="ki-uebernehmen">' + th('ki.uebernehmen') + '</button><button class="knopf klein" data-aktion="ki-zu">' + th('ki.verwerfen') + '</button></div></div>';
   }
 
   function kiBefundeHtml() {
     var b = S.kiBefunde;
-    if (b.laedt) return '<div class="vorschlag-box"><h4>🔍 Die KI prüft auf Widersprüche …</h4><div class="kreisel"></div></div>';
+    if (b.laedt) return '<div class="vorschlag-box"><h4>' + th('ki.prueft') + '</h4><div class="kreisel"></div></div>';
     if (!b.befunde.length) {
-      return '<div class="vorschlag-box"><h4>🔍 Alles stimmig</h4><div class="unter">Keine Widersprüche gefunden.</div><div class="ki-leiste"><button class="knopf klein" data-aktion="ki-zu">OK</button></div></div>';
+      return '<div class="vorschlag-box"><h4>' + th('ki.stimmig') + '</h4><div class="unter">' + th('ki.keine') + '</div><div class="ki-leiste"><button class="knopf klein" data-aktion="ki-zu">' + th('ok') + '</button></div></div>';
     }
-    return '<div class="vorschlag-box"><h4>🔍 Das ist der KI aufgefallen</h4>' + b.befunde.map(function (x) {
+    return '<div class="vorschlag-box"><h4>' + th('ki.aufgefallen') + '</h4>' + b.befunde.map(function (x) {
       return '<div class="befund">' + (x.art === 'widerspruch' ? '⚠️ ' : '💬 ') + h(x.text) +
         (x.belege || []).map(function (q) { return '<q>' + h(q) + '</q>'; }).join('') + '</div>';
-    }).join('') + '<div class="ki-leiste"><button class="knopf klein" data-aktion="ki-zu">Schließen</button></div></div>';
+    }).join('') + '<div class="ki-leiste"><button class="knopf klein" data-aktion="ki-zu">' + th('schliessen') + '</button></div></div>';
   }
 
   /** Änderungen auf der Karte sofort speichern. */
@@ -1111,7 +1177,7 @@
     ta.className = 'freitext';
     ta.dataset.freitext = '1';
     ta.value = e.text || '';
-    ta.placeholder = 'Frei schreiben – die KI kann daraus später den Steckbrief füllen.';
+    ta.placeholder = t('karte.freitextPlatz');
     box.replaceWith(ta);
     autoHoehe(ta);
     ta.focus();
@@ -1128,7 +1194,7 @@
     var a = art(e.art);
     var felder = (a.felder || []).slice();
     Object.keys(e.felder || {}).forEach(function (k) { if (felder.indexOf(k) < 0) felder.push(k); });
-    if (!felder.length) { toast('Diese Art hat keine Felder. Felder lassen sich unter „Mehr“ festlegen.'); return; }
+    if (!felder.length) { toast(t('ki.keineFelder')); return; }
     S.kiVorschlag = { id: e.id, laedt: true };
     render();
     rufe('bwKiFelder', {
@@ -1162,7 +1228,7 @@
     blaetterVormerken(vorher);
     speichere(e).then(render);
     render();
-    toast('✨ Übernommen');
+    toast(t('ki.uebernommen'));
   }
 
   function kiPruefen() {
@@ -1186,7 +1252,7 @@
 
   function kiBereit() {
     if (S.ki.aktiv) return true;
-    toast('Für die KI-Hilfe fehlt noch ein API-Schlüssel.', { aktion: 'Einrichten', beiAktion: function () { geheZu('einstellungen'); setTimeout(function () { var k = $('#ki-key'); if (k) { k.scrollIntoView(); k.focus(); } }, 50); } });
+    toast(t('ki.fehltKey'), { aktion: t('ki.einrichten'), beiAktion: function () { geheZu('einstellungen'); setTimeout(function () { var k = $('#ki-key'); if (k) { k.scrollIntoView(); k.focus(); } }, 50); } });
     return false;
   }
 
@@ -1217,32 +1283,30 @@
 
   function ereignisHtml(z) {
     return '<div class="ereignis"><div class="notiz" style="--c:' + art('zeit').farbe + '" data-eintrag="' + h(z.id) + '">' +
-      '<div class="notiz-kopf"><span class="datum">' + h(z.name || 'ohne Datum') + '</span><span class="rechts">' + stelleKnopf(z) +
-      '<button class="mini" data-menue="' + h(z.id) + '" title="Mehr">⋯</button></span></div>' +
-      (S.bearbeiten === z.id
-        ? '<textarea data-auto data-bearbeiten="' + h(z.id) + '">' + h(alsEingabe(z)) + '</textarea><div class="ki-leiste"><button class="knopf primaer klein" data-aktion="bearbeiten-ok" data-id="' + h(z.id) + '">Fertig</button><button class="knopf klein" data-aktion="bearbeiten-abbruch">Abbrechen</button></div>'
-        : '<div class="notiz-text">' + textHtml(z.text) + '</div>') + '</div></div>';
+      '<div class="notiz-kopf"><span class="datum">' + h(z.name || t('zeit.ohneDatum')) + '</span><span class="rechts">' + stelleKnopf(z) +
+      '<button class="mini" data-menue="' + h(z.id) + '" title="' + th('mehr') + '">⋯</button></span></div>' +
+      (S.bearbeiten === z.id ? bearbeitenHtml(z) : '<div class="notiz-text">' + textHtml(z.text) + '</div>') + '</div></div>';
   }
 
   function renderZeit() {
     var alle = S.eintraege.filter(function (e) { return e.art === 'zeit'; }).sort(nachDatum);
     var personen = {};
     alle.forEach(function (z) { (D.graph.raus[z.id] || []).forEach(function (id) { personen[id] = true; }); });
-    var auswahl = Object.keys(personen).map(eintrag).filter(Boolean).sort(function (a, b) { return a.name.localeCompare(b.name, 'de'); });
+    var auswahl = Object.keys(personen).map(eintrag).filter(Boolean).sort(function (a, b) { return a.name.localeCompare(b.name, I.locale()); });
     var gefiltert = S.zeitMit ? alle.filter(function (z) { return (D.graph.raus[z.id] || []).indexOf(S.zeitMit) >= 0; }) : alle;
-    var zw = (art('zeit').woerter || ['Zeit'])[0];
+    var feld = 'border:1px solid var(--linie);border-radius:6px;padding:5px 7px;outline:0';
     var html = '<div class="eingabe" style="padding:8px;display:flex;gap:6px;flex-wrap:wrap">' +
-      '<input id="z-datum" placeholder="Wann? z. B. 12. März" style="flex:1 1 100px;border:1px solid var(--linie);border-radius:6px;padding:5px 7px;outline:0">' +
-      '<input id="z-text" placeholder="Was passiert?" style="flex:2 1 140px;border:1px solid var(--linie);border-radius:6px;padding:5px 7px;outline:0">' +
+      '<input id="z-datum" placeholder="' + th('zeit.wann') + '" style="flex:1 1 100px;' + feld + '">' +
+      '<input id="z-text" placeholder="' + th('zeit.was') + '" style="flex:2 1 140px;' + feld + '">' +
       '<button class="knopf primaer klein" data-aktion="zeit-neu">＋</button></div>';
     if (auswahl.length) {
-      html += '<div class="filter"><button class="chip' + (S.zeitMit ? '' : ' aktiv') + '" data-zeitmit="">Alle</button>' +
+      html += '<div class="filter"><button class="chip' + (S.zeitMit ? '' : ' aktiv') + '" data-zeitmit="">' + th('filter.alle') + '</button>' +
         auswahl.map(function (k) {
           return '<button class="chip' + (S.zeitMit === k.id ? ' aktiv' : '') + '" data-zeitmit="' + h(k.id) + '">' + art(k.art).icon + ' ' + h(k.name) + '</button>';
         }).join('') + '</div>';
     }
     if (!gefiltert.length) {
-      return html + '<div class="leer"><div class="gross">📅</div>Noch keine Ereignisse.<br>Tipp: Im Notizfeld <b>' + h(zw) + ' 12. März: Lena trifft Jonas</b></div>';
+      return html + '<div class="leer"><div class="gross">📅</div>' + th('zeit.leer') + '<br>' + th('zeit.tipp') + ' <b>' + th('zeit.beispiel', { wort: erstesWort('zeit') }) + '</b></div>';
     }
     return html + '<div class="zeitstrahl" style="margin-top:10px">' + gefiltert.map(ereignisHtml).join('') + '</div>';
   }
@@ -1255,33 +1319,31 @@
     var ideen = S.eintraege.filter(function (e) { return e.art === 'idee'; })
       .sort(function (a, b) { return String(b.erstellt).localeCompare(String(a.erstellt)); });
     var html = '<div class="eingabe" style="padding:8px;display:flex;gap:6px">' +
-      '<input id="idee-text" placeholder="💡 Neue Idee …" style="flex:1;border:0;outline:0;padding:4px">' +
+      '<input id="idee-text" placeholder="' + th('idee.neu') + '" style="flex:1;border:0;outline:0;padding:4px">' +
       '<button class="knopf primaer klein" data-aktion="idee-neu">＋</button></div>';
-    var spalten = [
-      { id: 'offen', titel: '💭 Offen', leer: 'Keine offenen Ideen.' },
-      { id: 'verwendet', titel: '✅ Verwendet', leer: '' },
-      { id: 'verworfen', titel: '🗑️ Verworfen', leer: '' }
-    ];
-    spalten.forEach(function (s) {
+    [
+      { id: 'offen', leer: t('idee.keineOffen') },
+      { id: 'verwendet', leer: '' },
+      { id: 'verworfen', leer: '' }
+    ].forEach(function (s) {
       var liste = ideen.filter(function (e) { return (e.status || 'offen') === s.id; });
       if (!liste.length && !s.leer) return;
-      html += '<div class="spalte"><div class="gruppe-kopf" style="margin-top:12px">' + s.titel + ' <span class="zahl">' + liste.length + '</span></div>' +
-        (liste.length ? liste.map(ideeHtml).join('') : '<div class="unter">' + s.leer + '</div>') + '</div>';
+      html += '<div class="spalte"><div class="gruppe-kopf" style="margin-top:12px">' + th('idee.' + s.id) + ' <span class="zahl">' + liste.length + '</span></div>' +
+        (liste.length ? liste.map(ideeHtml).join('') : '<div class="unter">' + h(s.leer) + '</div>') + '</div>';
     });
     return html;
   }
 
   function ideeHtml(e) {
     var status = e.status || 'offen';
+    var knopf = function (neu, text) { return '<button class="knopf klein" data-status="' + neu + '" data-id="' + h(e.id) + '">' + th(text) + '</button>'; };
     var knoepfe = status === 'offen'
-      ? '<button class="knopf klein" data-status="verwendet" data-id="' + h(e.id) + '">✓ Verwendet</button><button class="knopf klein" data-status="verworfen" data-id="' + h(e.id) + '">Verwerfen</button>'
-      : '<button class="knopf klein" data-status="offen" data-id="' + h(e.id) + '">↺ Wieder offen</button>';
+      ? knopf('verwendet', 'idee.knopf.verwendet') + knopf('verworfen', 'idee.knopf.verwerfen')
+      : knopf('offen', 'idee.knopf.offen');
     return '<div class="idee' + (status === 'verworfen' ? ' verworfen' : '') + '" data-eintrag="' + h(e.id) + '">' +
       '<div class="notiz-kopf">' + (e.name ? '<span class="titel">' + h(e.name) + '</span>' : '') + '<span class="rechts">' + stelleKnopf(e) +
-      '<button class="mini" data-menue="' + h(e.id) + '">⋯</button></span></div>' +
-      (S.bearbeiten === e.id
-        ? '<textarea data-auto data-bearbeiten="' + h(e.id) + '">' + h(alsEingabe(e)) + '</textarea><div class="ki-leiste"><button class="knopf primaer klein" data-aktion="bearbeiten-ok" data-id="' + h(e.id) + '">Fertig</button><button class="knopf klein" data-aktion="bearbeiten-abbruch">Abbrechen</button></div>'
-        : '<div class="notiz-text">' + textHtml(e.text) + '</div>') +
+      '<button class="mini" data-menue="' + h(e.id) + '" title="' + th('mehr') + '">⋯</button></span></div>' +
+      (S.bearbeiten === e.id ? bearbeitenHtml(e) : '<div class="notiz-text">' + textHtml(e.text) + '</div>') +
       '<div class="idee-fuss">' + knoepfe + '</div></div>';
   }
 
@@ -1297,35 +1359,43 @@
     }, function () {});
   }
 
+  function datumKurz(iso) {
+    try {
+      return new Date(iso + 'T12:00:00').toLocaleDateString(I.locale(), { day: 'numeric', month: 'numeric' });
+    } catch (err) {
+      return iso;
+    }
+  }
+
   function renderZiel() {
     var s = S.stat, ziel = Number(S.einst.tagesziel) || 0, gesamtziel = Number(S.einst.gesamtziel) || 0;
-    if (!s) return '<div class="laden"><div class="kreisel"></div>Wörter werden gezählt …</div>';
+    if (!s) return '<div class="laden"><div class="kreisel"></div>' + th('ziel.zaehlt') + '</div>';
     var anteil = ziel ? Math.min(1, s.heute / ziel) : 0;
     var u = 2 * Math.PI * 38;
     var ring = '<svg class="ring" viewBox="0 0 92 92"><circle cx="46" cy="46" r="38" fill="none" stroke="#e8eaed" stroke-width="9"/>' +
       '<circle cx="46" cy="46" r="38" fill="none" stroke="' + (anteil >= 1 ? '#34a853' : '#1a73e8') + '" stroke-width="9" stroke-linecap="round" stroke-dasharray="' + (u * anteil) + ' ' + u + '" transform="rotate(-90 46 46)"/>' +
       '<text x="46" y="52" text-anchor="middle" font-size="17" font-weight="700" fill="#202124">' + Math.round(anteil * 100) + '%</text></svg>';
     var tage = s.verlauf.slice(-14);
-    var max = Math.max(ziel, 1, Math.max.apply(null, tage.map(function (t) { return t.geschrieben; })));
+    var max = Math.max(ziel, 1, Math.max.apply(null, tage.map(function (x) { return x.geschrieben; })));
     var serie = 0;
     for (var i = s.verlauf.length - 1; i >= 0; i--) {
       if (ziel && s.verlauf[i].geschrieben >= ziel) serie++;
       else if (i !== s.verlauf.length - 1) break;
     }
-    var html = '<div class="block"><div class="block-titel">Heute</div><div class="ring-box">' + ring + '<div>' +
-      '<div class="zahl-gross">' + s.heute.toLocaleString('de-DE') + '</div><div class="unter" style="margin:0">von ' + ziel.toLocaleString('de-DE') + ' Wörtern</div>' +
-      (anteil >= 1 ? '<div style="margin-top:4px">🎉 Tagesziel geschafft!</div>' : ziel ? '<div style="margin-top:4px;color:var(--text-2)">Noch ' + (ziel - s.heute).toLocaleString('de-DE') + ' Wörter</div>' : '') +
-      (serie > 1 ? '<div style="margin-top:2px">🔥 ' + serie + ' Tage in Folge</div>' : '') + '</div></div></div>';
-    html += '<div class="block"><div class="block-titel">Letzte 14 Tage<span class="rechts"><button class="link" data-aktion="statistik">↻</button></span></div><div class="balken">' +
-      tage.map(function (t, j) {
-        return '<div class="' + (ziel && t.geschrieben >= ziel ? 'erreicht' : '') + (j === tage.length - 1 ? ' heute' : '') + '" style="height:' + Math.max(2, t.geschrieben / max * 100) + '%" title="' + t.datum + ': ' + t.geschrieben + ' Wörter"></div>';
-      }).join('') + '</div><div class="balken-achse"><span>' + (tage[0] ? tage[0].datum.slice(5).split('-').reverse().join('.') + '.' : '') + '</span><span>heute</span></div></div>';
-    html += '<div class="block"><div class="block-titel">Manuskript</div><div class="zahl-gross">' + s.gesamt.toLocaleString('de-DE') + ' <span style="font-size:13px;font-weight:400;color:var(--text-2)">Wörter</span></div>' +
-      '<div class="unter" style="margin:0">≈ ' + Math.round(s.gesamt / 250) + ' Normseiten</div>' +
-      (gesamtziel ? '<div class="fortschritt"><div style="width:' + Math.min(100, s.gesamt / gesamtziel * 100) + '%"></div></div><div class="unter">' + Math.round(s.gesamt / gesamtziel * 100) + ' % von ' + gesamtziel.toLocaleString('de-DE') + ' Wörtern</div>' : '') + '</div>';
-    html += '<div class="block"><div class="block-titel">Ziele</div><div class="zielfelder">' +
-      '<label for="z-tag">Wörter pro Tag</label><input id="z-tag" type="number" min="0" step="50" data-ziel="tagesziel" value="' + ziel + '">' +
-      '<label for="z-ges">Ziel fürs ganze Buch</label><input id="z-ges" type="number" min="0" step="1000" data-ziel="gesamtziel" value="' + (gesamtziel || '') + '" placeholder="z. B. 80000">' +
+    var html = '<div class="block"><div class="block-titel">' + th('ziel.heute') + '</div><div class="ring-box">' + ring + '<div>' +
+      '<div class="zahl-gross">' + I.zahl(s.heute) + '</div><div class="unter" style="margin:0">' + th('ziel.von', { n: I.zahl(ziel) }) + '</div>' +
+      (anteil >= 1 ? '<div style="margin-top:4px">' + th('ziel.geschafft') + '</div>' : ziel ? '<div style="margin-top:4px;color:var(--text-2)">' + th('ziel.noch', { n: I.zahl(ziel - s.heute) }) + '</div>' : '') +
+      (serie > 1 ? '<div style="margin-top:2px">' + th('ziel.serie', { n: serie }) + '</div>' : '') + '</div></div></div>';
+    html += '<div class="block"><div class="block-titel">' + th('ziel.letzte') + '<span class="rechts"><button class="link" data-aktion="statistik">↻</button></span></div><div class="balken">' +
+      tage.map(function (x, j) {
+        return '<div class="' + (ziel && x.geschrieben >= ziel ? 'erreicht' : '') + (j === tage.length - 1 ? ' heute' : '') + '" style="height:' + Math.max(2, x.geschrieben / max * 100) + '%" title="' + th('ziel.tag', { datum: datumKurz(x.datum), n: I.zahl(x.geschrieben) }) + '"></div>';
+      }).join('') + '</div><div class="balken-achse"><span>' + (tage[0] ? h(datumKurz(tage[0].datum)) : '') + '</span><span>' + th('ziel.heuteAchse') + '</span></div></div>';
+    html += '<div class="block"><div class="block-titel">' + th('ziel.manuskript') + '</div><div class="zahl-gross">' + I.zahl(s.gesamt) + ' <span style="font-size:13px;font-weight:400;color:var(--text-2)">' + th('ziel.woerter') + '</span></div>' +
+      '<div class="unter" style="margin:0">' + th('ziel.seiten', { n: I.zahl(Math.round(s.gesamt / 250)) }) + '</div>' +
+      (gesamtziel ? '<div class="fortschritt"><div style="width:' + Math.min(100, s.gesamt / gesamtziel * 100) + '%"></div></div><div class="unter">' + th('ziel.anteil', { p: Math.round(s.gesamt / gesamtziel * 100), n: I.zahl(gesamtziel) }) + '</div>' : '') + '</div>';
+    html += '<div class="block"><div class="block-titel">' + th('ziel.ziele') + '</div><div class="zielfelder">' +
+      '<label for="z-tag">' + th('ziel.proTag') + '</label><input id="z-tag" type="number" min="0" step="50" data-ziel="tagesziel" value="' + ziel + '">' +
+      '<label for="z-ges">' + th('ziel.buch') + '</label><input id="z-ges" type="number" min="0" step="1000" data-ziel="gesamtziel" value="' + (gesamtziel || '') + '" placeholder="' + th('ziel.bsp') + '">' +
       '</div></div>';
     return html;
   }
@@ -1336,47 +1406,59 @@
 
   function renderEinstellungen() {
     var e = S.einst;
-    var html = '<div class="block"><div class="block-titel">Dein Buch</div><div class="links">' +
-      '<a href="' + h(S.tabelleUrl) + '" target="_blank">📊 Tabelle mit allen Einträgen öffnen</a>' +
-      (S.ordnerUrl ? '<a href="' + h(S.ordnerUrl) + '" target="_blank">📁 Ordner mit den Personenblättern</a>' : '') +
-      '</div><div class="unter">Die Tabelle lässt sich auch in der Google-Tabellen-App am Handy lesen.</div></div>';
+    var autoName = I.SPRACHEN.filter(function (s) { return s.id === I.automatisch(S.kontoSprache); })[0].name;
+    var html = '<div class="block"><div class="block-titel">' + th('einst.buch') + '</div><div class="links">' +
+      '<a href="' + h(S.tabelleUrl) + '" target="_blank">' + th('einst.tabelle') + '</a>' +
+      (S.ordnerUrl ? '<a href="' + h(S.ordnerUrl) + '" target="_blank">' + th('einst.ordner') + '</a>' : '') +
+      '</div><div class="unter">' + th('einst.tabelleInfo') + '</div></div>';
 
-    html += '<div class="block"><div class="block-titel">Verhalten</div>' +
-      schalter('anheften', '📌 Neue Notizen an die Cursor-Stelle heften', 'Unsichtbar am Absatz verankert – „Hier“ zeigt dann die Notizen zum aktuellen Kapitel.') +
-      schalter('blaetterAuto', '📄 Personenblätter als Google Docs', 'Für jede Karte ein Doc im Ordner „' + h(S.buch) + ' – Welt“. Im Text oder am iPhone einfach @Name tippen und das Blatt einfügen.') +
-      '<div class="ki-leiste"><button class="knopf klein" data-aktion="blaetter-alle">📄 Alle Blätter jetzt erstellen</button></div>' +
-      '<div class="ki-leiste"><button class="knopf klein" data-aktion="markieren">🖍️ Namen im Text markieren</button><button class="knopf klein" data-aktion="markierung-weg">Markierungen entfernen</button></div>' +
-      '<div class="unter">Färbt alle Namen im Manuskript in der Farbe ihrer Art ein. Entfernt werden nur diese Markierungen.</div></div>';
+    html += '<div class="block"><div class="block-titel">🌐 ' + th('einst.sprache') + '</div>' +
+      '<div class="einst-zeile" style="margin-top:0"><select id="sprache">' +
+      '<option value="auto"' + (!e.sprache || e.sprache === 'auto' ? ' selected' : '') + '>' + th('einst.spracheAuto', { name: autoName }) + '</option>' +
+      I.SPRACHEN.map(function (s) { return '<option value="' + s.id + '"' + (e.sprache === s.id ? ' selected' : '') + '>' + h(s.name) + '</option>'; }).join('') +
+      '</select></div><div class="unter">' + th('einst.spracheInfo') + '</div></div>';
 
-    html += '<div class="block"><div class="block-titel">Schlüsselwörter & Felder</div>' +
-      '<div class="unter" style="margin-top:0">Das erste Wort einer Notiz entscheidet, was daraus wird. Mehrere Wörter mit Komma trennen.</div>' +
+    html += '<div class="block"><div class="block-titel">' + th('einst.verhalten') + '</div>' +
+      schalter('anheften', t('einst.anheften'), t('einst.anheften.info')) +
+      schalter('blaetterAuto', t('einst.blaetter'), t('einst.blaetter.info', { ordner: t('blatt.ordner', { buch: S.buch }) })) +
+      '<div class="ki-leiste"><button class="knopf klein" data-aktion="blaetter-alle">' + th('einst.blaetterAlle') + '</button></div>' +
+      '<div class="ki-leiste"><button class="knopf klein" data-aktion="markieren">' + th('einst.markieren') + '</button><button class="knopf klein" data-aktion="markierung-weg">' + th('einst.markWeg') + '</button></div>' +
+      '<div class="unter">' + th('einst.markInfo') + '</div></div>';
+
+    html += '<div class="block"><div class="block-titel">' + th('einst.arten') + '</div>' +
+      '<div class="unter" style="margin-top:0">' + th('einst.arten.info') + '</div>' +
       e.arten.map(function (a, i) {
         return '<details class="einst-art"><summary>' + a.icon + ' ' + h(a.name) + ' <span style="font-weight:400;color:var(--text-3)">' + h((a.woerter || []).join(', ')) + '</span></summary>' +
-          '<div class="einst-zeile"><label>Name</label><input data-art-i="' + i + '" data-art-feld="name" value="' + h(a.name) + '"></div>' +
-          '<div class="einst-zeile"><label>Symbol</label><input data-art-i="' + i + '" data-art-feld="icon" value="' + h(a.icon) + '" maxlength="4"></div>' +
-          '<div class="einst-zeile"><label>Schlüsselwörter</label><input data-art-i="' + i + '" data-art-feld="woerter" value="' + h((a.woerter || []).join(', ')) + '"></div>' +
-          (a.karte ? '<div class="einst-zeile"><label>Felder im Steckbrief (eins pro Zeile)</label><textarea rows="5" data-art-i="' + i + '" data-art-feld="felder">' + h((a.felder || []).join('\n')) + '</textarea></div>' : '') +
-          (['person', 'ort', 'ding', 'zeit', 'idee'].indexOf(a.id) < 0 ? '<div class="ki-leiste"><button class="knopf klein gefahr" data-aktion="art-loeschen" data-i="' + i + '">Art entfernen</button></div>' : '') +
+          '<div class="einst-zeile"><label>' + th('einst.art.name') + '</label><input data-art-i="' + i + '" data-art-feld="name" value="' + h(a.name) + '"></div>' +
+          '<div class="einst-zeile"><label>' + th('einst.art.symbol') + '</label><input data-art-i="' + i + '" data-art-feld="icon" value="' + h(a.icon) + '" maxlength="4"></div>' +
+          '<div class="einst-zeile"><label>' + th('einst.art.woerter') + '</label><input data-art-i="' + i + '" data-art-feld="woerter" value="' + h((a.woerter || []).join(', ')) + '"></div>' +
+          (a.karte ? '<div class="einst-zeile"><label>' + th('einst.art.felder') + '</label><textarea rows="5" data-art-i="' + i + '" data-art-feld="felder">' + h((a.felder || []).join('\n')) + '</textarea></div>' : '') +
+          (['person', 'ort', 'ding', 'zeit', 'idee'].indexOf(a.id) < 0 ? '<div class="ki-leiste"><button class="knopf klein gefahr" data-aktion="art-loeschen" data-i="' + i + '">' + th('einst.art.weg') + '</button></div>' : '') +
           '</details>';
       }).join('') +
-      '<button class="knopf klein" data-aktion="art-neu">＋ Eigene Art (z. B. Organisation, Tier)</button></div>';
+      '<button class="knopf klein" data-aktion="art-neu">' + th('einst.art.neu') + '</button></div>';
 
-    html += '<div class="block"><div class="block-titel">KI-Hilfe (Claude)</div>' +
+    html += '<div class="block"><div class="block-titel">' + th('einst.ki') + '</div>' +
+      '<div class="unter" style="margin-top:0">' + th('einst.ki.ohne') + '</div>' +
       (S.ki.aktiv
-        ? '<div>✅ Eingerichtet (Schlüssel endet auf …' + h(S.ki.ende) + ')</div><div class="ki-leiste"><button class="knopf klein gefahr" data-aktion="ki-weg">Schlüssel entfernen</button></div>'
-        : '<div class="unter" style="margin-top:0">Für „Steckbrief ausfüllen“ und „Widersprüche prüfen“ braucht es einen API-Schlüssel von <a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a>. Pro Karte kostet das meist weniger als einen Cent.</div>' +
-          '<div class="einst-zeile"><input id="ki-key" type="password" placeholder="sk-ant-…" autocomplete="off"></div><div class="ki-leiste"><button class="knopf primaer klein" data-aktion="ki-key">Speichern</button></div>') +
-      '<div class="einst-zeile"><label>Modell</label><select id="ki-modell">' +
-      [['claude-opus-5-5', 'Claude Opus 5.5 (beste Qualität)'], ['claude-sonnet-5-5', 'Claude Sonnet 5.5 (günstiger)'], ['claude-haiku-5-5', 'Claude Haiku 5.5 (am günstigsten)']]
-        .map(function (m) { return '<option value="' + m[0] + '"' + (e.kiModell === m[0] ? ' selected' : '') + '>' + m[1] + '</option>'; }).join('') +
-      '</select></div><div class="unter">Der Schlüssel wird nur in deinem Google-Konto gespeichert, nicht im Dokument.</div></div>';
+        ? '<div style="margin-top:6px">' + th('einst.ki.aktiv', { ende: S.ki.ende }) + '</div>' +
+          schalter('kiAnzeigen', t('einst.ki.anzeigen'), t('einst.ki.anzeigen.info')) +
+          '<div class="einst-zeile"><label>' + th('einst.ki.modell') + '</label><select id="ki-modell">' +
+          [['claude-opus-5-5', 'einst.ki.opus'], ['claude-sonnet-5-5', 'einst.ki.sonnet'], ['claude-haiku-5-5', 'einst.ki.haiku']]
+            .map(function (m) { return '<option value="' + m[0] + '"' + (e.kiModell === m[0] ? ' selected' : '') + '>' + th(m[1]) + '</option>'; }).join('') +
+          '</select></div>' +
+          '<div class="ki-leiste"><button class="knopf klein gefahr" data-aktion="ki-weg">' + th('einst.ki.weg') + '</button></div>'
+        : '<div class="unter">' + th('einst.ki.info') + ' <a href="https://console.anthropic.com/settings/keys" target="_blank">' + th('einst.ki.link') + '</a></div>' +
+          '<div class="einst-zeile"><input id="ki-key" type="password" placeholder="sk-ant-…" autocomplete="off"></div><div class="ki-leiste"><button class="knopf primaer klein" data-aktion="ki-key">' + th('speichern') + '</button></div>') +
+      '<div class="unter">' + th('einst.ki.privat') + '</div></div>';
 
-    html += '<div class="block"><div class="block-titel">Hilfe</div><button class="knopf klein" data-aktion="hilfe-an">Kurzanleitung wieder anzeigen</button></div>';
+    html += '<div class="block"><div class="block-titel">' + th('einst.hilfe') + '</div><button class="knopf klein" data-aktion="hilfe-an">' + th('einst.hilfeAn') + '</button></div>';
     return html;
   }
 
   function schalter(feld, titel, text) {
-    return '<label class="schalter"><input type="checkbox" data-schalter="' + feld + '"' + (S.einst[feld] ? ' checked' : '') + '><span>' + titel + '<small>' + text + '</small></span></label>';
+    var an = feld === 'kiAnzeigen' ? S.einst[feld] !== false : !!S.einst[feld];
+    return '<label class="schalter"><input type="checkbox" data-schalter="' + feld + '"' + (an ? ' checked' : '') + '><span>' + h(titel) + '<small>' + h(text) + '</small></span></label>';
   }
 
   function artFeldGeaendert(el) {
@@ -1385,7 +1467,8 @@
     if (f === 'woerter') a.woerter = el.value.split(',').map(function (s) { return s.trim().replace(/^#/, ''); }).filter(Boolean);
     else if (f === 'felder') a.felder = el.value.split('\n').map(function (s) { return s.trim(); }).filter(Boolean);
     else a[f] = el.value.trim() || a[f];
-    speichereEinstellungen().then(function () { toast('Gespeichert'); });
+    if (f === 'name') a.mehrzahl = a.name;
+    speichereEinstellungen().then(function () { toast(t('gespeichert')); });
   }
 
   var FARBEN = [['#00796b', '#d7efec'], ['#5e35b1', '#ebe5f6'], ['#ad1457', '#f8e1ec'], ['#455a64', '#e3e8eb'], ['#ef6c00', '#fde9d9']];
@@ -1393,7 +1476,8 @@
   function neueArt() {
     var nr = S.einst.arten.length;
     var farbe = FARBEN[nr % FARBEN.length];
-    S.einst.arten.push({ id: 'art' + Date.now().toString(36), name: 'Neue Art', mehrzahl: 'Neue Art', icon: '⭐', farbe: farbe[0], hell: farbe[1], woerter: [], karte: true, felder: ['Beschreibung'] });
+    var name = t('einst.art.neuName');
+    S.einst.arten.push({ id: 'art' + Date.now().toString(36), name: name, mehrzahl: name, icon: '⭐', farbe: farbe[0], hell: farbe[1], woerter: [], karte: true, felder: [t('einst.art.feld')] });
     speichereEinstellungen();
     render();
     var d = $$('.einst-art');
@@ -1406,8 +1490,8 @@
       var e = eintrag(D.index.namen[n].ids[0]);
       if (e && !D.index.namen[n].schwach) begriffe.push({ text: n, farbe: art(e.art).hell });
     });
-    if (!begriffe.length) { toast('Noch keine Namen zum Markieren.'); return; }
-    sichere('bwHervorheben', begriffe).then(function (n) { toast('🖍️ ' + n + ' Stellen markiert'); });
+    if (!begriffe.length) { toast(t('einst.keineNamen')); return; }
+    sichere('bwHervorheben', begriffe).then(function (n) { toast(t('einst.markiert', { n: n })); });
   }
 
   /* -------------------------------------------------------------- */
@@ -1427,7 +1511,7 @@
       var info = felder.length ? felder.slice(0, 3).join(' · ') : C.ausschnitt(e.text, 80) || a.name;
       el.innerHTML = '<span class="spot-icon" style="' + stilFarbe(a) + '">' + a.icon + '</span><span class="spot-text"><div class="spot-name">' + h(e.name) + '</div><div class="spot-info">' + h(info) + '</div></span><span class="spot-pfeil">›</span>';
       el.dataset.id = e.id;
-      el.title = 'Karte öffnen';
+      el.title = t('karte.oeffnen');
       el.hidden = false;
       return;
     }
@@ -1436,7 +1520,7 @@
     if (!ids.length) { el.hidden = true; return; }
     el.dataset.id = '';
     el.title = '';
-    el.innerHTML = '<span style="font-size:11px;color:var(--text-3);white-space:nowrap">Im Absatz:</span><span class="verbunden" style="flex:1;min-width:0">' +
+    el.innerHTML = '<span style="font-size:11px;color:var(--text-3);white-space:nowrap">' + th('spot.absatz') + '</span><span class="verbunden" style="flex:1;min-width:0">' +
       ids.slice(0, 6).map(function (id) {
         var e = eintrag(id);
         return '<button class="ref" data-id="' + h(id) + '" style="--c:' + art(e.art).farbe + '">' + art(e.art).icon + ' ' + h(e.name) + '</button>';
@@ -1444,13 +1528,12 @@
     el.hidden = false;
   }
 
-  var cursorLaeuft = false, cursorFehler = 0;
+  var cursorLaeuft = false;
   function frageCursor() {
     if (cursorLaeuft || document.hidden) return;
     cursorLaeuft = true;
     rufe('bwCursor').then(function (c) {
       cursorLaeuft = false;
-      cursorFehler = 0;
       var alt = S.cursor;
       S.cursor = c || S.cursor;
       if (!c) return;
@@ -1462,13 +1545,12 @@
       }
     }, function () {
       cursorLaeuft = false;
-      cursorFehler++;
     });
   }
 
   function ladeTextstellen() {
-    return rufe('bwTextstellen').then(function (t) {
-      S.textstellen = t || {};
+    return rufe('bwTextstellen').then(function (s) {
+      S.textstellen = s || {};
       if (S.ansicht === 'notizen' && !S.bearbeiten) renderNotizListe();
     }, function () {});
   }
@@ -1501,16 +1583,16 @@
     'karten-menue': function (b) {
       var e = eintrag(S.karteId);
       var r = b.getBoundingClientRect();
-      var optionen = [{ html: '📝 Notiz zu ' + h(e.name), tun: AKTIONEN['notiz-zu'] }];
-      if (e.blatt) optionen.push({ html: '📄 Personenblatt öffnen', tun: function () { window.open('https://docs.google.com/document/d/' + e.blatt + '/edit', '_blank'); } });
-      else optionen.push({ html: '📄 Personenblatt erstellen', tun: function () { S.blaetterOffen[e.id] = true; blaetterSenden().then(function () { toast('📄 Blatt erstellt'); }); } });
-      if (e.anker) optionen.push({ html: '📌 Wo ich sie angelegt habe', tun: function () { springe(e); } });
-      optionen.push({ html: '<span style="color:var(--gefahr)">🗑️ Karte löschen</span>', tun: function () { loesche(e, '„' + e.name + '“ wirklich löschen? Notizen bleiben erhalten.'); } });
+      var optionen = [{ html: th('karte.menue.notiz', { name: e.name }), tun: AKTIONEN['notiz-zu'] }];
+      if (e.blatt) optionen.push({ html: th('karte.menue.blattAuf'), tun: function () { window.open('https://docs.google.com/document/d/' + e.blatt + '/edit', '_blank'); } });
+      else optionen.push({ html: th('karte.menue.blattNeu'), tun: function () { S.blaetterOffen[e.id] = true; blaetterSenden().then(function () { toast(t('karte.menue.blattFertig')); }); } });
+      if (e.anker) optionen.push({ html: th('karte.menue.wo'), tun: function () { springe(e); } });
+      optionen.push({ html: gefahr(t('karte.menue.loeschen')), tun: function () { loesche(e, t('loeschen.frage', { name: e.name })); } });
       auswahlMenue(r.right - 190, r.bottom + 2, null, optionen);
     },
     'bez-neu': function () {
       var ziel = $('#bez-ziel').value, artText = $('#bez-art').value.trim();
-      if (!ziel) { toast('Bitte auswählen, mit wem.'); return; }
+      if (!ziel) { toast(t('karte.bezWaehlen')); return; }
       neueBeziehung(S.karteId, ziel, artText);
       render();
     },
@@ -1524,30 +1606,30 @@
     'bearbeiten-ok': function (b) { bearbeitenFertig(b.dataset.id); },
     'bearbeiten-abbruch': function () { S.bearbeiten = null; render(); },
     'zeit-neu': function () {
-      var d = $('#z-datum').value.trim(), t = $('#z-text').value.trim();
-      if (!d && !t) return;
-      speichere({ art: 'zeit', name: d, text: t }).then(render);
+      var d = $('#z-datum').value.trim(), x = $('#z-text').value.trim();
+      if (!d && !x) return;
+      speichere({ art: 'zeit', name: d, text: x }).then(render);
       render();
       $('#z-datum').focus();
     },
     'idee-neu': function () {
-      var t = $('#idee-text').value.trim();
-      if (!t) return;
-      speichere({ art: 'idee', name: '', text: t, status: 'offen' }).then(render);
+      var x = $('#idee-text').value.trim();
+      if (!x) return;
+      speichere({ art: 'idee', name: '', text: x, status: 'offen' }).then(render);
       render();
       $('#idee-text').focus();
     },
     'statistik': ladeStatistik,
     'blaetter-alle': function () {
-      toast('📄 Blätter werden erstellt – das kann etwas dauern …', { dauer: 10000 });
-      blaetterSenden(true).then(function () { toast('📄 Alle Personenblätter sind aktuell.'); render(); });
+      toast(t('einst.blaetterLaeuft'), { dauer: 10000 });
+      blaetterSenden(true).then(function () { toast(t('einst.blaetterFertig')); render(); });
     },
     'markieren': markieren,
-    'markierung-weg': function () { sichere('bwHervorhebungEntfernen').then(function (n) { toast('Markierungen entfernt'); }); },
+    'markierung-weg': function () { sichere('bwHervorhebungEntfernen').then(function () { toast(t('einst.markEntfernt')); }); },
     'art-neu': neueArt,
     'art-loeschen': function (b) {
       var a = S.einst.arten[Number(b.dataset.i)];
-      if (S.eintraege.some(function (e) { return e.art === a.id; })) { toast('Es gibt noch Einträge dieser Art.'); return; }
+      if (S.eintraege.some(function (e) { return e.art === a.id; })) { toast(t('einst.art.belegt')); return; }
       S.einst.arten.splice(Number(b.dataset.i), 1);
       speichereEinstellungen();
       render();
@@ -1555,87 +1637,102 @@
     'ki-key': function () {
       var k = $('#ki-key').value.trim();
       if (!k) return;
-      sichere('bwKiSchluesselSetzen', k).then(function (st) { S.ki = st; render(); toast('✨ KI-Hilfe ist eingerichtet'); });
+      sichere('bwKiSchluesselSetzen', k).then(function (st) {
+        S.ki = st;
+        S.einst.kiAnzeigen = true;
+        speichereEinstellungen();
+        render();
+        toast(t('einst.ki.fertig'));
+      });
     },
     'ki-weg': function () { sichere('bwKiSchluesselSetzen', '').then(function (st) { S.ki = st; render(); }); }
   };
 
   function klick(ev) {
-    var t = ev.target;
-    var nav = t.closest('[data-nav]');
+    var z = ev.target;
+    var nav = z.closest('[data-nav]');
     if (nav) { geheZu(nav.dataset.nav); return; }
-    if (!t.closest('.auswahl-menue')) schliesseMenues();
+    if (!z.closest('.auswahl-menue')) schliesseMenues();
     var b;
-    if ((b = t.closest('.ref.neu'))) {
+    if ((b = z.closest('.ref.neu'))) {
       var r = b.getBoundingClientRect();
       neuAnlegenMenue(b.dataset.neu, r.left, r.bottom + 4);
       return;
     }
-    if ((b = t.closest('[data-ids]'))) {
+    if ((b = z.closest('[data-ids]'))) {
       var r2 = b.getBoundingClientRect();
-      auswahlMenue(r2.left, r2.bottom + 4, 'Welche Karte?', b.dataset.ids.split(',').map(function (id) {
+      auswahlMenue(r2.left, r2.bottom + 4, t('welcheKarte'), b.dataset.ids.split(',').map(function (id) {
         var e = eintrag(id);
         return { html: art(e.art).icon + ' ' + h(e.name), tun: function () { oeffneKarte(id); } };
       }));
       return;
     }
-    if ((b = t.closest('[data-id].ref, .zeile[data-id]'))) { oeffneKarte(b.dataset.id); return; }
-    if ((b = t.closest('#spot'))) { if (b.dataset.id) oeffneKarte(b.dataset.id); return; }
-    if ((b = t.closest('[data-stelle]'))) { springe(eintrag(b.dataset.stelle)); return; }
-    if ((b = t.closest('[data-menue]'))) { notizMenue(b.dataset.menue, b); return; }
-    if ((b = t.closest('[data-filter]'))) {
+    if ((b = z.closest('[data-id].ref, .zeile[data-id]'))) { oeffneKarte(b.dataset.id); return; }
+    if ((b = z.closest('#spot'))) { if (b.dataset.id) oeffneKarte(b.dataset.id); return; }
+    if ((b = z.closest('[data-stelle]'))) { springe(eintrag(b.dataset.stelle)); return; }
+    if ((b = z.closest('[data-menue]'))) { notizMenue(b.dataset.menue, b); return; }
+    if ((b = z.closest('[data-filter]'))) {
       S.filter = b.dataset.filter;
       merke('filter', S.filter);
       if (S.filter === 'hier') ladeTextstellen();
       renderNotizListe();
       return;
     }
-    if ((b = t.closest('[data-zeitmit]'))) { S.zeitMit = b.dataset.zeitmit; render(); return; }
-    if ((b = t.closest('[data-status]'))) {
+    if ((b = z.closest('[data-zeitmit]'))) { S.zeitMit = b.dataset.zeitmit; render(); return; }
+    if ((b = z.closest('[data-status]'))) {
       var e = eintrag(b.dataset.id);
       e.status = b.dataset.status;
       speichere(e);
       render();
       return;
     }
-    if ((b = t.closest('[data-aktion]')) && AKTIONEN[b.dataset.aktion]) {
+    if ((b = z.closest('[data-aktion]')) && AKTIONEN[b.dataset.aktion]) {
       AKTIONEN[b.dataset.aktion](b, ev);
     }
   }
 
   function aenderung(ev) {
-    var t = ev.target;
-    if (t.dataset.feld || t.dataset.steckbrief) { karteFeldGeaendert(t); return; }
-    if (t.dataset.schalter) {
-      S.einst[t.dataset.schalter] = t.checked;
+    var z = ev.target;
+    if (z.dataset.feld || z.dataset.steckbrief) { karteFeldGeaendert(z); return; }
+    if (z.dataset.schalter) {
+      S.einst[z.dataset.schalter] = z.checked;
       speichereEinstellungen();
       return;
     }
-    if (t.dataset.artFeld) { artFeldGeaendert(t); return; }
-    if (t.dataset.ziel) {
-      S.einst[t.dataset.ziel] = Math.max(0, Number(t.value) || 0);
+    if (z.dataset.artFeld) { artFeldGeaendert(z); return; }
+    if (z.dataset.ziel) {
+      S.einst[z.dataset.ziel] = Math.max(0, Number(z.value) || 0);
       speichereEinstellungen().then(function () { zeigeStatus(); if (S.ansicht === 'ziel') render(); });
       return;
     }
-    if (t.id === 'ki-modell') { S.einst.kiModell = t.value; speichereEinstellungen(); }
+    if (z.id === 'sprache') { wechsleSprache(z.value); return; }
+    if (z.id === 'ki-modell') { S.einst.kiModell = z.value; speichereEinstellungen(); }
   }
 
   function tasten(ev) {
-    var t = ev.target;
+    var z = ev.target;
     if (ev.key === 'Enter' && !ev.shiftKey) {
-      if (t.id === 'neu-name') { ev.preventDefault(); neueKarteAnlegen(S.neuIn); }
-      else if (t.id === 'z-text' || t.id === 'z-datum') { ev.preventDefault(); AKTIONEN['zeit-neu'](); }
-      else if (t.id === 'idee-text') { ev.preventDefault(); AKTIONEN['idee-neu'](); }
-      else if (t.id === 'ki-key') { ev.preventDefault(); AKTIONEN['ki-key'](); }
-      else if (t.dataset.bearbeiten) { ev.preventDefault(); bearbeitenFertig(t.dataset.bearbeiten); }
-      else if (t.classList.contains('karte-name') || t.classList.contains('feld-alias')) { ev.preventDefault(); t.blur(); }
+      if (z.id === 'neu-name') { ev.preventDefault(); neueKarteAnlegen(S.neuIn); }
+      else if (z.id === 'z-text' || z.id === 'z-datum') { ev.preventDefault(); AKTIONEN['zeit-neu'](); }
+      else if (z.id === 'idee-text') { ev.preventDefault(); AKTIONEN['idee-neu'](); }
+      else if (z.id === 'ki-key') { ev.preventDefault(); AKTIONEN['ki-key'](); }
+      else if (z.dataset.bearbeiten) { ev.preventDefault(); bearbeitenFertig(z.dataset.bearbeiten); }
+      else if (z.classList.contains('karte-name') || z.classList.contains('feld-alias')) { ev.preventDefault(); z.blur(); }
     }
     if (ev.key === 'Escape') {
-      if (t.dataset.bearbeiten) { S.bearbeiten = null; render(); }
-      else if (t.id === 'neu-name') { S.neuIn = null; render(); }
+      if (z.dataset.bearbeiten) { S.bearbeiten = null; render(); }
+      else if (z.id === 'neu-name') { S.neuIn = null; render(); }
       else schliesseMenues();
     }
-    if (ev.key === 'Backspace' && S.ansicht === 'karte' && !/INPUT|TEXTAREA|SELECT/.test(t.tagName) && ev.altKey) zurueck();
+  }
+
+  function weltSuche(ev) {
+    S.weltSuche = ev.target.value.trim();
+    var pos = ev.target.selectionStart;
+    render();
+    var feld = $('#weltsuche');
+    feld.focus();
+    feld.setSelectionRange(pos, pos);
   }
 
   /* -------------------------------------------------------------- */
@@ -1643,24 +1740,32 @@
   /* -------------------------------------------------------------- */
 
   function start() {
+    wendeSpracheAn();
+    $('#ansicht .laden').lastChild.textContent = t('laden');
     document.addEventListener('click', klick);
     document.addEventListener('change', aenderung);
     document.addEventListener('keydown', tasten);
-    document.addEventListener('input', function (ev) { if (ev.target.matches('textarea[data-auto]')) autoHoehe(ev.target); });
+    document.addEventListener('input', function (ev) {
+      if (ev.target.matches('textarea[data-auto]')) autoHoehe(ev.target);
+      if (ev.target.id === 'weltsuche') weltSuche(ev);
+    });
     rufe('bwLaden').then(function (d) {
       S.buch = d.buch;
       S.tabelleUrl = d.tabelleUrl;
       S.ordnerUrl = d.ordnerUrl;
+      S.kontoSprache = d.kontoSprache;
+      S.standardArten = d.standardArten || {};
       S.einst = d.einstellungen;
       S.eintraege = d.eintraege;
       S.beziehungen = d.beziehungen;
       S.ki = d.ki;
+      wendeSpracheAn();
       $('#buchtitel').textContent = d.buch;
       $('#buchtitel').title = d.buch;
       berechne();
       $('#ansicht').innerHTML = '';
       render();
-      if (!S.einst.hinweisGesehen && !S.eintraege.length) setTimeout(function () { var t = $('#neu'); if (t) t.focus(); }, 100);
+      if (!S.einst.hinweisGesehen && !S.eintraege.length) setTimeout(function () { var x = $('#neu'); if (x) x.focus(); }, 100);
       ladeTextstellen();
       ladeStatistik();
       frageCursor();
@@ -1668,7 +1773,7 @@
       setInterval(ladeTextstellen, 60000);
       setInterval(ladeStatistik, 300000);
     }, function (err) {
-      $('#ansicht').innerHTML = '<div class="leer"><div class="gross">😕</div>Die Buchwerkstatt konnte nicht geladen werden.<br><small>' + h(fehlertext(err)) + '</small><br><br><button class="knopf" onclick="location.reload()">Nochmal versuchen</button></div>';
+      $('#ansicht').innerHTML = '<div class="leer"><div class="gross">😕</div>' + th('laden.fehler') + '<br><small>' + h(fehlertext(err)) + '</small><br><br><button class="knopf" onclick="location.reload()">' + th('nochmal') + '</button></div>';
     });
     window.addEventListener('beforeunload', function () { if (Object.keys(S.blaetterOffen).length) blaetterSenden(); });
   }

@@ -7,7 +7,7 @@
  * ganz ohne Add-on. Die Blätter verlinken sich außerdem gegenseitig.
  *
  * Den Inhalt baut die Seitenleiste zusammen; hier wird er nur geschrieben.
- * blatt = { id, titel, untertitel, blattId, abschnitte: [{ titel, zeilen: [[{t, z}]] }] }
+ * blatt = { id, titel, untertitel, fusszeile, blattId, abschnitte: [{ titel, zeilen: [[{t, z}]] }] }
  * Eine Zeile ist eine Liste von Stücken; z = ID einer anderen Karte → Link.
  */
 
@@ -88,7 +88,7 @@ function schreibeBlatt_(docId, b, blattVon) {
     });
   });
   body.appendParagraph('');
-  body.appendParagraph('Automatisch erstellt von der Buchwerkstatt. Änderungen bitte in der Seitenleiste vornehmen – sie werden hier überschrieben.')
+  body.appendParagraph(b.fusszeile || '')
     .editAsText().setItalic(true).setFontSize(9).setForegroundColor('#80868b');
   doc.saveAndClose();
 }
@@ -104,7 +104,7 @@ function weltOrdner_() {
     } catch (err) { /* neu anlegen */ }
   }
   var doc = DocumentApp.getActiveDocument();
-  var name = doc.getName() + ' – Welt';
+  var name = doc.getName() + ' – ' + tx_('ordner');
   var eltern = DriveApp.getFileById(doc.getId()).getParents();
   var ordner = eltern.hasNext() ? eltern.next().createFolder(name) : DriveApp.createFolder(name);
   props.setProperty(BW_PROP_ORDNER, ordner.getId());

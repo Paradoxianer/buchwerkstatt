@@ -37,6 +37,14 @@
     ki: false
   };
 
+  var englisch = location.hash.indexOf('en') >= 0;
+  var STANDARD_EN = [
+    { id: 'person', name: 'Character', mehrzahl: 'Characters', icon: '👤', farbe: '#3367d6', hell: '#dfe8fb', woerter: ['Character', 'Person'], karte: true, felder: ['Age', 'Appearance', 'Occupation', 'Personality', 'Background', 'Goal / Motivation', 'Voice'] },
+    { id: 'ort', name: 'Place', mehrzahl: 'Places', icon: '📍', farbe: '#188038', hell: '#dcf1e3', woerter: ['Place', 'Location'], karte: true, felder: ['Kind', 'Location', 'Atmosphere', 'Details'] },
+    { id: 'ding', name: 'Object', mehrzahl: 'Objects', icon: '🔑', farbe: '#b06000', hell: '#fbecd3', woerter: ['Object', 'Item'], karte: true, felder: ['Appearance', 'Origin', 'Significance'] },
+    { id: 'zeit', name: 'Event', mehrzahl: 'Timeline', icon: '📅', farbe: '#8430ce', hell: '#efe1fb', woerter: ['Time', 'When'], karte: false, felder: [] },
+    { id: 'idee', name: 'Idea', mehrzahl: 'Ideas', icon: '💡', farbe: '#c5221f', hell: '#fbe0e0', woerter: ['Idea'], karte: false, felder: [] }
+  ];
   var STANDARD = {
     arten: [
       { id: 'person', name: 'Person', mehrzahl: 'Personen', icon: '👤', farbe: '#3367d6', hell: '#dfe8fb', woerter: ['Person', 'Figur'], karte: true, felder: ['Alter', 'Aussehen', 'Beruf', 'Charakter', 'Herkunft', 'Ziel / Motivation', 'Sprechweise'] },
@@ -45,9 +53,12 @@
       { id: 'zeit', name: 'Ereignis', mehrzahl: 'Zeitstrahl', icon: '📅', farbe: '#8430ce', hell: '#efe1fb', woerter: ['Zeit', 'Wann'], karte: false, felder: [] },
       { id: 'idee', name: 'Idee', mehrzahl: 'Ideen', icon: '💡', farbe: '#c5221f', hell: '#fbe0e0', woerter: ['Idee'], karte: false, felder: [] }
     ],
-    tagesziel: 500, gesamtziel: 80000, anheften: true, blaetterAuto: true, kiModell: 'claude-opus-5-5', hinweisGesehen: false
+    sprache: 'auto', tagesziel: 500, gesamtziel: 80000, anheften: true, blaetterAuto: true, kiAnzeigen: true, kiModell: 'claude-opus-5-5', hinweisGesehen: false
   };
+  var STANDARD_DE = JSON.parse(JSON.stringify(STANDARD.arten));
   db.einstellungen = JSON.parse(JSON.stringify(STANDARD));
+  if (englisch) db.einstellungen.arten = JSON.parse(JSON.stringify(STANDARD_EN));
+  if (location.hash.indexOf('ki') >= 0) db.ki = true;
   if (location.hash.indexOf('leer') >= 0) {
     db.eintraege = [];
     db.beziehungen = [];
@@ -55,7 +66,8 @@
 
   var server = {
     bwLaden: function () {
-      return { buch: 'Die Taschenuhr (Roman)', tabelleUrl: '#', ordnerUrl: '#', einstellungen: db.einstellungen, eintraege: db.eintraege, beziehungen: db.beziehungen, ki: { aktiv: db.ki, ende: db.ki ? 'abcd' : '' } };
+      return { buch: 'Die Taschenuhr (Roman)', tabelleUrl: '#', ordnerUrl: '#', kontoSprache: englisch ? 'en' : 'de',
+        standardArten: { de: STANDARD_DE, en: STANDARD_EN }, einstellungen: db.einstellungen, eintraege: db.eintraege, beziehungen: db.beziehungen, ki: { aktiv: db.ki, ende: db.ki ? 'abcd' : '' } };
     },
     bwSpeichern: function (e, opt) {
       var neu = !e.id || e.id.indexOf('tmp') === 0;

@@ -8,10 +8,10 @@
 function onOpen(e) {
   DocumentApp.getUi()
     .createAddonMenu()
-    .addItem('Buchwerkstatt öffnen', 'zeigeSeitenleiste')
+    .addItem(tx_('menueOeffnen'), 'zeigeSeitenleiste')
     .addSeparator()
-    .addItem('Namen im Text farbig markieren', 'menueHervorheben')
-    .addItem('Markierungen wieder entfernen', 'menueHervorhebungEntfernen')
+    .addItem(tx_('menueMarkieren'), 'menueHervorheben')
+    .addItem(tx_('menueEntfernen'), 'menueHervorhebungEntfernen')
     .addToUi();
 }
 
@@ -33,7 +33,7 @@ function include(name) {
 
 function menueHervorheben() {
   var anzahl = hervorhebenAlle_();
-  DocumentApp.getUi().alert('Buchwerkstatt', anzahl + ' Stellen markiert.', DocumentApp.getUi().ButtonSet.OK);
+  DocumentApp.getUi().alert('Buchwerkstatt', tx_('markiert', { n: anzahl }), DocumentApp.getUi().ButtonSet.OK);
 }
 
 function menueHervorhebungEntfernen() {

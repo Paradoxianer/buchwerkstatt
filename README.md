@@ -1,5 +1,7 @@
 # 📖 Buchwerkstatt
 
+*🇬🇧 English summary [below](#english).*
+
 Eine Erweiterung für **Google Docs**, die beim Romanschreiben den Überblick behält: Notizen, Figuren, Orte, Gegenstände, Zeitstrahl, Ideen-Pinnwand und Schreibziel stehen direkt neben dem Manuskript.
 
 Die Grundidee: **Es gibt nur einen Notizblock.** Das erste Wort einer Notiz entscheidet, was daraus wird:
@@ -33,7 +35,8 @@ Die Grundidee: **Es gibt nur einen Notizblock.** Das erste Wort einer Notiz ents
 - **🎯 Ziel:** Wörter heute, Tagesziel, Verlauf der letzten 14 Tage, Serie und Fortschritt fürs ganze Buch.
 - **📄 Personenblätter fürs Handy:** Zu jeder Karte entsteht automatisch ein kleines Google Doc im Ordner „*Buchtitel* – Welt“. Damit funktioniert in Google Docs **`@Lena`** als Verweis (Smart Chip), auch in der **Docs-App am iPhone**. Die Blätter sind untereinander verlinkt.
 - **🖍️ Namen im Text markieren:** Färbt alle Namen im Manuskript ein. Ein Klick entfernt die Markierungen wieder.
-- **✨ KI-Hilfe (optional, mit Claude):**
+- **🌐 Mehrsprachig:** Oberfläche, Schlüsselwörter, Steckbrief-Felder, Datumserkennung, Tabelle und Personenblätter gibt es auf Deutsch und Englisch. Die Sprache wird automatisch aus dem Google-Konto übernommen oder unter **⚙️ Mehr → Sprache** gewählt. Weitere Sprachen sind ein einzelnes Wörterbuch in `src/I18n.html` und `src/Sprachen.gs`.
+- **✨ KI-Hilfe (rein optional, mit Claude):** Die Buchwerkstatt funktioniert **vollständig ohne KI**. Ohne API-Schlüssel taucht die KI nirgends auf, und mit Schlüssel lässt sie sich jederzeit wieder ausblenden.
   - *Steckbrief ausfüllen*: Die KI liest Beschreibung und alle Notizen zur Karte und schlägt Felder, weitere Namen und Beziehungen vor. Übernommen wird nur, was angehakt ist.
   - *Widersprüche prüfen*: Findet z. B. „grüne Augen“ in Kapitel 3 und „braune Augen“ in Kapitel 17.
 
@@ -78,13 +81,13 @@ Die Erweiterung wird als Apps-Script-Projekt an das Manuskript gehängt. Das mus
 
 1. Manuskript öffnen → **Erweiterungen → Apps Script**.
 2. Für jede Datei aus dem Ordner [`src/`](src) im Editor über **＋ → Skript** (für `.gs`) bzw. **＋ → HTML** (für `.html`) eine Datei **mit gleichem Namen** anlegen und den Inhalt hineinkopieren:
-   `Main`, `Store`, `Dokument`, `Blaetter`, `Ki`, `Statistik` (Skript) sowie `Sidebar`, `Styles`, `Core`, `App` (HTML). Die vorhandene `Code.gs` kann gelöscht werden.
+   `Main`, `Store`, `Sprachen`, `Dokument`, `Blaetter`, `Ki`, `Statistik` (Skript) sowie `Sidebar`, `Styles`, `I18n`, `Core`, `App` (HTML). Die vorhandene `Code.gs` kann gelöscht werden.
 3. **⚙️ Projekteinstellungen → „Manifestdatei appsscript.json im Editor anzeigen“** aktivieren und den Inhalt von [`src/appsscript.json`](src/appsscript.json) übernehmen.
 4. Speichern, das Manuskript neu laden → **Erweiterungen → Buchwerkstatt → Buchwerkstatt öffnen**.
 
 ### Beim ersten Start
 
-Google fragt nach Berechtigungen (Dokument, Tabellen, Drive und Internetzugriff für die KI). Da die Erweiterung nicht im Marketplace veröffentlicht ist, erscheint „Google hat diese App nicht überprüft“. Dann auf **Erweitert → Zu Buchwerkstatt wechseln** klicken. Das ist bei eigenen Skripten normal.
+Google fragt nach Berechtigungen (Dokument, Tabellen, Drive und Internetzugriff, Letzteres nur für die optionale KI). Da die Erweiterung nicht im Marketplace veröffentlicht ist, erscheint „Google hat diese App nicht überprüft“. Dann auf **Erweitert → Zu Buchwerkstatt wechseln** klicken. Das ist bei eigenen Skripten normal.
 
 Wer die Seitenleiste benutzt, muss die Berechtigungen **selbst** bestätigen. Also beim ersten Mal am besten mit dem Konto öffnen, mit dem auch geschrieben wird.
 
@@ -111,12 +114,14 @@ Der Schlüssel wird nur in den Benutzereinstellungen des eigenen Google-Kontos g
 src/            Apps-Script-Projekt (wird mit clasp hochgeladen)
   Main.gs         Menü, Seitenleiste
   Store.gs        Tabelle als Datenablage, Einstellungen
+  Sprachen.gs     Server-Texte und Standard-Schlüsselwörter/Felder je Sprache
   Dokument.gs     Cursor, Textstellen (Named Ranges), Kapitel, Markieren, Vorkommen
   Blaetter.gs     Personenblätter als Google Docs
   Ki.gs           Claude-API (Felder füllen, Widersprüche prüfen)
   Statistik.gs    Wortzahl & Tagesverlauf
   Sidebar.html    Gerüst der Seitenleiste
   Styles.html     Aussehen
+  I18n.html       Übersetzungen der Oberfläche (Deutsch, Englisch)
   Core.html       Logik ohne Oberfläche: Notiz zerlegen, Namen finden, Datum sortieren
   App.html        Oberfläche
 dev/            Vorschau ohne Google (mock.js ersetzt google.script.run)
@@ -131,4 +136,31 @@ npm test
 npm run vorschau
 ```
 
-`npm run vorschau` baut `dist/vorschau.html` mit Beispieldaten. Die Datei lässt sich einfach im Browser öffnen (`#leer` am Ende der Adresse startet mit einem leeren Buch).
+`npm run vorschau` baut `dist/vorschau.html` mit Beispieldaten. Die Datei lässt sich einfach im Browser öffnen. Am Ende der Adresse startet `#leer` mit einem leeren Buch, `#en` auf Englisch und `#ki` mit eingerichteter KI. Die Zusätze lassen sich kombinieren, z. B. `#en-ki`.
+
+### Neue Sprache hinzufügen
+
+1. `src/I18n.html`: ein Wörterbuch mit denselben Schlüsseln wie `de` anlegen und in `SPRACHEN` eintragen.
+2. `src/Sprachen.gs`: in `BW_TEXTE` und `BW_STANDARD_ARTEN` ergänzen und in `BW_SPRACHEN` aufnehmen. Für die KI zusätzlich den Sprachnamen in `BW_KI_SPRACHEN` (`Ki.gs`) eintragen.
+3. `src/Core.html`: Monatsnamen in `MONATE` und das Wort für „Tag“ in `TAG_WOERTER` ergänzen, damit der Zeitstrahl Datumsangaben erkennt.
+
+---
+
+## English
+
+**Buchwerkstatt** (“book workshop”) is a Google Docs add-on for novelists: notes, characters, places, objects, a timeline, an idea board and a writing goal, right next to your manuscript. It works **entirely without AI**. Claude can optionally fill in character profiles and look for contradictions.
+
+There is just one note field, and the first word decides what a note becomes:
+
+| You type … | You get … |
+|---|---|
+| `Character Lena: 34, midwife, red curls` | a new character card |
+| `Place Harbour: smells of diesel` | a new place |
+| `Object Pocket watch: belonged to her father` | a new object |
+| `When March 12: Lena meets Jonas` | a timeline event |
+| `Idea: What if Jonas is her brother?` | an idea-board card |
+| `@Lena has a scar on her hand` | a note about Lena |
+
+Known names (and nicknames listed under “Also called”) are linked automatically. Notes are pinned invisibly to the paragraph where your cursor is. For each card a small Google Doc is created, so `@Lena` works as a smart chip in Google Docs, even on a phone.
+
+The language follows your Google account or can be chosen under **⚙️ More → Language**. Setup works as described above: attach the `src/` files to your manuscript via **Extensions → Apps Script**, either with `clasp` or by copy and paste.

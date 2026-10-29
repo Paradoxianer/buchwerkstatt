@@ -7,6 +7,8 @@
  *
  * Die Spalten werden über ihre Überschrift gefunden, damit man die Tabelle
  * auch von Hand (z. B. in der Tabellen-App am Handy) lesen und bearbeiten kann.
+ * Blatt- und Spaltennamen gibt es in jeder Sprache; erkannt wird jede davon,
+ * neu angelegt wird in der aktuellen Sprache.
  */
 
 var BW_PROP_DB = 'BW_DATENBANK';
@@ -14,34 +16,30 @@ var BW_PROP_EINST = 'BW_EINSTELLUNGEN';
 var BW_PROP_ORDNER = 'BW_ORDNER';
 
 var BW_EINTRAG = {
-  blatt: 'Einträge',
+  blatt: { de: 'Einträge', en: 'Entries' },
   felder: ['id', 'art', 'name', 'aliase', 'text', 'felder', 'bezug', 'status', 'anker', 'kapitel', 'blatt', 'erstellt', 'geaendert'],
-  koepfe: ['ID', 'Art', 'Name', 'Auch genannt', 'Text', 'Felder', 'Bezug', 'Status', 'Textstelle', 'Kapitel', 'Blatt', 'Erstellt', 'Geändert'],
+  koepfe: {
+    de: ['ID', 'Art', 'Name', 'Auch genannt', 'Text', 'Felder', 'Bezug', 'Status', 'Textstelle', 'Kapitel', 'Blatt', 'Erstellt', 'Geändert'],
+    en: ['ID', 'Type', 'Name', 'Also called', 'Text', 'Fields', 'Linked to', 'Status', 'Passage', 'Chapter', 'Document', 'Created', 'Changed']
+  },
   breiten: [90, 80, 160, 160, 360, 260, 90, 80, 90, 160, 90, 120, 120]
 };
 
 var BW_BEZIEHUNG = {
-  blatt: 'Beziehungen',
+  blatt: { de: 'Beziehungen', en: 'Relationships' },
   felder: ['id', 'von', 'nach', 'art'],
-  koepfe: ['ID', 'Von', 'Nach', 'Beziehung'],
+  koepfe: { de: ['ID', 'Von', 'Nach', 'Beziehung'], en: ['ID', 'From', 'To', 'Relationship'] },
   breiten: [90, 90, 90, 200]
 };
 
+/** Grundeinstellungen. Die Arten (Schlüsselwörter, Felder) kommen je nach Sprache aus Sprachen.gs. */
 var BW_STANDARD = {
-  arten: [
-    { id: 'person', name: 'Person', mehrzahl: 'Personen', icon: '👤', farbe: '#3367d6', hell: '#dfe8fb', woerter: ['Person', 'Figur'], karte: true,
-      felder: ['Alter', 'Aussehen', 'Beruf', 'Charakter', 'Herkunft', 'Ziel / Motivation', 'Sprechweise'] },
-    { id: 'ort', name: 'Ort', mehrzahl: 'Orte', icon: '📍', farbe: '#188038', hell: '#dcf1e3', woerter: ['Ort'], karte: true,
-      felder: ['Art', 'Lage', 'Atmosphäre', 'Besonderheiten'] },
-    { id: 'ding', name: 'Gegenstand', mehrzahl: 'Gegenstände', icon: '🔑', farbe: '#b06000', hell: '#fbecd3', woerter: ['Ding', 'Gegenstand'], karte: true,
-      felder: ['Aussehen', 'Herkunft', 'Bedeutung'] },
-    { id: 'zeit', name: 'Ereignis', mehrzahl: 'Zeitstrahl', icon: '📅', farbe: '#8430ce', hell: '#efe1fb', woerter: ['Zeit', 'Wann'], karte: false, felder: [] },
-    { id: 'idee', name: 'Idee', mehrzahl: 'Ideen', icon: '💡', farbe: '#c5221f', hell: '#fbe0e0', woerter: ['Idee'], karte: false, felder: [] }
-  ],
+  sprache: 'auto',
   tagesziel: 500,
   gesamtziel: 0,
   anheften: true,
   blaetterAuto: true,
+  kiAnzeigen: true,
   kiModell: 'claude-opus-5-5',
   hinweisGesehen: false
 };
@@ -55,10 +53,14 @@ function bwLaden() {
   var ss = datenbank_();
   var doc = DocumentApp.getActiveDocument();
   var ordnerId = PropertiesService.getDocumentProperties().getProperty(BW_PROP_ORDNER);
+  var standardArten = {};
+  BW_SPRACHEN.forEach(function (s) { standardArten[s] = standardArten_(s); });
   return {
     buch: doc.getName(),
     tabelleUrl: ss.getUrl(),
     ordnerUrl: ordnerId ? 'https://drive.google.com/drive/folders/' + ordnerId : '',
+    kontoSprache: kontoSprache_(),
+    standardArten: standardArten,
     einstellungen: einstellungen_(),
     eintraege: liesTabelle_(blatt_(ss, BW_EINTRAG), BW_EINTRAG).map(eintragAusZeile_),
     beziehungen: liesTabelle_(blatt_(ss, BW_BEZIEHUNG), BW_BEZIEHUNG),
@@ -152,6 +154,7 @@ function bwBeziehungLoeschen(id) {
 
 function bwEinstellungenSpeichern(neu) {
   PropertiesService.getDocumentProperties().setProperty(BW_PROP_EINST, JSON.stringify(neu));
+  bwCacheSprache_ = null;
   return einstellungen_();
 }
 
@@ -160,12 +163,20 @@ function bwEinstellungenSpeichern(neu) {
 /* ------------------------------------------------------------------ */
 
 function einstellungen_() {
-  var roh = PropertiesService.getDocumentProperties().getProperty(BW_PROP_EINST);
-  var gespeichert = {};
-  try { gespeichert = roh ? JSON.parse(roh) : {}; } catch (err) { gespeichert = {}; }
+  var gespeichert = einstellungenRoh_();
   var e = JSON.parse(JSON.stringify(BW_STANDARD));
+  e.arten = standardArten_(sprache_());
   Object.keys(gespeichert).forEach(function (k) { e[k] = gespeichert[k]; });
   return e;
+}
+
+function einstellungenRoh_() {
+  try {
+    var roh = PropertiesService.getDocumentProperties().getProperty(BW_PROP_EINST);
+    return roh ? JSON.parse(roh) : {};
+  } catch (err) {
+    return {};
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -192,7 +203,7 @@ function datenbank_() {
     ss = SpreadsheetApp.create(doc.getName() + ' – Buchwerkstatt');
     neben_(ss.getId(), doc.getId());
     var erstes = ss.getSheets()[0];
-    erstes.setName(BW_EINTRAG.blatt);
+    erstes.setName(BW_EINTRAG.blatt[sprache_()] || BW_EINTRAG.blatt.en);
     props.setProperty(BW_PROP_DB, ss.getId());
   }
   bwCacheDb_ = ss;
@@ -210,13 +221,15 @@ function neben_(dateiId, docId) {
 }
 
 function blatt_(ss, def) {
-  var sheet = ss.getSheetByName(def.blatt);
-  if (!sheet) sheet = ss.insertSheet(def.blatt);
+  var sheet = null;
+  Object.keys(def.blatt).forEach(function (s) { sheet = sheet || ss.getSheetByName(def.blatt[s]); });
+  if (!sheet) sheet = ss.insertSheet(def.blatt[sprache_()] || def.blatt.en);
   if (sheet.getLastRow() === 0) {
-    sheet.getRange(1, 1, 1, def.koepfe.length).setValues([def.koepfe]).setFontWeight('bold').setBackground('#f1f3f4');
+    var koepfe = def.koepfe[sprache_()] || def.koepfe.en;
+    sheet.getRange(1, 1, 1, koepfe.length).setValues([koepfe]).setFontWeight('bold').setBackground('#f1f3f4');
     sheet.setFrozenRows(1);
     // Alles als reinen Text speichern, sonst macht die Tabelle aus „12. März“ ein Datum.
-    sheet.getRange(1, 1, sheet.getMaxRows(), def.koepfe.length).setNumberFormat('@');
+    sheet.getRange(1, 1, sheet.getMaxRows(), koepfe.length).setNumberFormat('@');
     def.breiten.forEach(function (b, i) { sheet.setColumnWidth(i + 1, b); });
   }
   return sheet;
@@ -228,11 +241,15 @@ function spalten_(sheet, def) {
   var koepfe = sheet.getRange(1, 1, 1, breite).getValues()[0].map(String);
   var index = {};
   def.felder.forEach(function (f, i) {
-    var pos = koepfe.indexOf(def.koepfe[i]);
+    var pos = -1;
+    Object.keys(def.koepfe).forEach(function (s) {
+      if (pos < 0) pos = koepfe.indexOf(def.koepfe[s][i]);
+    });
     if (pos < 0) {
+      var kopf = (def.koepfe[sprache_()] || def.koepfe.en)[i];
       pos = koepfe.length;
-      koepfe.push(def.koepfe[i]);
-      sheet.getRange(1, pos + 1).setValue(def.koepfe[i]).setFontWeight('bold').setBackground('#f1f3f4');
+      koepfe.push(kopf);
+      sheet.getRange(1, pos + 1).setValue(kopf).setFontWeight('bold').setBackground('#f1f3f4');
     }
     index[f] = pos;
   });
