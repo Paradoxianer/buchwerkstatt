@@ -56,8 +56,10 @@ npx clasp login
 npx clasp create --type standalone --title "Buchwerkstatt" --rootDir src
 ```
 
+Falls clasp die Datei `.clasp.json` in `src/` statt ins Hauptverzeichnis legt, einfach verschieben (`mv src/.clasp.json .`).
+
 ```bash
-npx clasp push --force
+npm run push
 ```
 
 Zum Testen vor der Veröffentlichung: Im Apps-Script-Editor (`npx clasp open`) **Bereitstellen → Bereitstellungen testen → Editor-Add-on** wählen und ein Test-Dokument auswählen. Die Buchwerkstatt erscheint dann in diesem Dokument unter **Erweiterungen**.

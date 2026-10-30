@@ -4,3 +4,4 @@ node_modules/
 dist/
 dev/screenshots/
 src/Version.gs
+.clasp.gebunden.json
