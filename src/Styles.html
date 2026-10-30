@@ -95,10 +95,15 @@
   .notiz.provisorisch { opacity: .6; }
   .notiz-kopf { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-2); margin-bottom: 3px; }
   .notiz-kopf .art { font-weight: 600; color: var(--c); }
-  .notiz-kopf .titel { color: var(--text); font-weight: 600; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .notiz-kopf .titel { color: var(--text); font-weight: 600; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 0 1 auto; }
+  .notiz-kopf .rechts { flex: none; }
+  .notiz-kopf .ref.titel { color: var(--c); }
   .notiz-kopf .rechts { margin-left: auto; display: flex; gap: 2px; align-items: center; }
-  .stelle { border: 0; background: var(--grund); border-radius: 10px; padding: 1px 7px; font-size: 11px; color: var(--text-2); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .stelle { border: 0; background: var(--grund); border-radius: 10px; padding: 1px 7px; font-size: 11px; color: var(--text-2); max-width: 104px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .stelle:hover { background: #fef7e0; color: #b06000; }
+  .pin-los { border: 0; background: none; border-radius: 10px; padding: 1px 5px; font-size: 12px; line-height: 1.2; opacity: .3; filter: grayscale(1); transition: opacity .15s; }
+  .notiz:hover .pin-los, .idee:hover .pin-los, .pin-los:focus { opacity: .75; }
+  .pin-los:hover { opacity: 1 !important; filter: none; background: #fef7e0; }
   .mini { border: 0; background: none; border-radius: 6px; padding: 2px 5px; color: var(--text-3); font-size: 13px; line-height: 1; }
   .mini:hover { background: var(--grund); color: var(--text); }
   .notiz-text { word-wrap: break-word; }

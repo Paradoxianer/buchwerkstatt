@@ -18,7 +18,7 @@
 
 var BW_KI_URL = 'https://api.anthropic.com/v1/messages';
 var BW_PROP_KI = 'BW_ANTHROPIC_KEY';
-var BW_KI_SPRACHEN = { de: 'German', en: 'English' };
+var BW_KI_SPRACHEN = { de: 'German', en: 'English', fr: 'French', es: 'Spanish', it: 'Italian', pt: 'Portuguese', nl: 'Dutch' };
 
 function kiSprache_() {
   return BW_KI_SPRACHEN[sprache_()] || 'English';

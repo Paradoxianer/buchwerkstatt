@@ -27,7 +27,12 @@ Die Grundidee: **Es gibt nur einen Notizblock.** Das erste Wort einer Notiz ents
 
 ## Was sie kann
 
-- **📝 Notizen an der Textstelle:** Neue Notizen werden unsichtbar an den Absatz geheftet, in dem der Cursor steht. „📍 Hier“ zeigt die Notizen zum aktuellen Kapitel, und 📌 springt zurück zur Stelle im Text.
+- **📌 Notizen an Absatz oder Wort heften:** Jede Notiz hat oben rechts einen Pin.
+  - Ein Klick heftet sie an den **Absatz**, in dem der Cursor steht.
+  - Ist im Text ein **Wort oder Satzteil markiert**, hängt sie **genau daran**; auf der Notiz steht dann z. B. 📌 „Taschenuhr“.
+  - Ein Klick auf eine angeheftete Notiz springt zur Stelle; ein angeheftetes Wort wird dabei markiert.
+  - Über ⋯ lässt sich eine Notiz neu anheften oder vom Text lösen.
+  - Neue Notizen werden auf Wunsch automatisch angeheftet. „📍 Hier“ zeigt die Notizen zum aktuellen Kapitel in der Reihenfolge des Textes.
 - **👤 Karte unter dem Cursor:** Steht der Cursor auf einem Namen, erscheint oben die Kurzinfo zur Figur. Sonst zeigt die Leiste, wer im aktuellen Absatz vorkommt.
 - **👥 Welt:** Alle Figuren, Orte und Gegenstände mit Steckbrief, Beschreibung, Beziehungen („Tochter von“) und automatischen Verbindungen. Eigene Arten (z. B. „Organisation“) lassen sich mit eigenen Feldern anlegen.
 - **📅 Zeitstrahl:** Ereignisse nach Datum im Buch sortiert, filterbar nach Figur. Erkannt werden z. B. „12. März“, „3.4.1987“ und „Tag 5“.
@@ -35,7 +40,7 @@ Die Grundidee: **Es gibt nur einen Notizblock.** Das erste Wort einer Notiz ents
 - **🎯 Ziel:** Wörter heute, Tagesziel, Verlauf der letzten 14 Tage, Serie und Fortschritt fürs ganze Buch.
 - **📄 Personenblätter fürs Handy:** Zu jeder Karte entsteht automatisch ein kleines Google Doc im Ordner „*Buchtitel* – Welt“. Damit funktioniert in Google Docs **`@Lena`** als Verweis (Smart Chip), auch in der **Docs-App am iPhone**. Die Blätter sind untereinander verlinkt.
 - **🖍️ Namen im Text markieren:** Färbt alle Namen im Manuskript ein. Ein Klick entfernt die Markierungen wieder.
-- **🌐 Mehrsprachig:** Oberfläche, Schlüsselwörter, Steckbrief-Felder, Datumserkennung, Tabelle und Personenblätter gibt es auf Deutsch und Englisch. Die Sprache wird automatisch aus dem Google-Konto übernommen oder unter **⚙️ Mehr → Sprache** gewählt. Weitere Sprachen sind ein einzelnes Wörterbuch in `src/I18n.html` und `src/Sprachen.gs`.
+- **🌐 Mehrsprachig:** Deutsch, Englisch, Französisch, Spanisch, Italienisch, Portugiesisch und Niederländisch. Übersetzt sind Oberfläche, Schlüsselwörter (`Personnage …`, `Personaje …`, `Quand …`), Steckbrief-Felder, Tabelle, Menü, Personenblätter und die Antworten der KI. Der Zeitstrahl versteht Datumsangaben in allen diesen Sprachen („12 de marzo de 1987“, „1er avril“, „14h30“, „March 12th“). Die Sprache wird automatisch aus dem Google-Konto übernommen oder unter **⚙️ Mehr → Sprache** gewählt.
 - **✨ KI-Hilfe (rein optional, mit Claude):** Die Buchwerkstatt funktioniert **vollständig ohne KI**. Ohne API-Schlüssel taucht die KI nirgends auf, und mit Schlüssel lässt sie sich jederzeit wieder ausblenden.
   - *Steckbrief ausfüllen*: Die KI liest Beschreibung und alle Notizen zur Karte und schlägt Felder, weitere Namen und Beziehungen vor. Übernommen wird nur, was angehakt ist.
   - *Widersprüche prüfen*: Findet z. B. „grüne Augen“ in Kapitel 3 und „braune Augen“ in Kapitel 17.
@@ -81,7 +86,7 @@ Die Erweiterung wird als Apps-Script-Projekt an das Manuskript gehängt. Das mus
 
 1. Manuskript öffnen → **Erweiterungen → Apps Script**.
 2. Für jede Datei aus dem Ordner [`src/`](src) im Editor über **＋ → Skript** (für `.gs`) bzw. **＋ → HTML** (für `.html`) eine Datei **mit gleichem Namen** anlegen und den Inhalt hineinkopieren:
-   `Main`, `Store`, `Sprachen`, `Dokument`, `Blaetter`, `Ki`, `Statistik` (Skript) sowie `Sidebar`, `Styles`, `I18n`, `Core`, `App` (HTML). Die vorhandene `Code.gs` kann gelöscht werden.
+   `Main`, `Store`, `Sprachen`, `Dokument`, `Blaetter`, `Ki`, `Statistik` (Skript) sowie `Sidebar`, `Styles`, `I18n`, `I18n_fr`, `I18n_es`, `I18n_it`, `I18n_pt`, `I18n_nl`, `Core`, `App` (HTML). Die vorhandene `Code.gs` kann gelöscht werden.
 3. **⚙️ Projekteinstellungen → „Manifestdatei appsscript.json im Editor anzeigen“** aktivieren und den Inhalt von [`src/appsscript.json`](src/appsscript.json) übernehmen.
 4. Speichern, das Manuskript neu laden → **Erweiterungen → Buchwerkstatt → Buchwerkstatt öffnen**.
 
@@ -121,7 +126,8 @@ src/            Apps-Script-Projekt (wird mit clasp hochgeladen)
   Statistik.gs    Wortzahl & Tagesverlauf
   Sidebar.html    Gerüst der Seitenleiste
   Styles.html     Aussehen
-  I18n.html       Übersetzungen der Oberfläche (Deutsch, Englisch)
+  I18n.html       Übersetzungen der Oberfläche (Deutsch, Englisch) und Sprachwahl
+  I18n_xx.html    weitere Sprachen (fr, es, it, pt, nl) – je ein Wörterbuch
   Core.html       Logik ohne Oberfläche: Notiz zerlegen, Namen finden, Datum sortieren
   App.html        Oberfläche
 dev/            Vorschau ohne Google (mock.js ersetzt google.script.run)
@@ -136,11 +142,13 @@ npm test
 npm run vorschau
 ```
 
-`npm run vorschau` baut `dist/vorschau.html` mit Beispieldaten. Die Datei lässt sich einfach im Browser öffnen. Am Ende der Adresse startet `#leer` mit einem leeren Buch, `#en` auf Englisch und `#ki` mit eingerichteter KI. Die Zusätze lassen sich kombinieren, z. B. `#en-ki`.
+`npm run vorschau` baut `dist/vorschau.html` mit Beispieldaten. Die Datei lässt sich einfach im Browser öffnen. Am Ende der Adresse startet `#leer` mit einem leeren Buch, `#ki` mit eingerichteter KI, und ein Sprachkürzel (`#en`, `#fr`, `#es`, `#it`, `#pt`, `#nl`) wählt die Sprache. Die Zusätze lassen sich kombinieren, z. B. `#leer-fr-ki`.
+
+`npm test` prüft auch, dass jede Sprache alle Texte mit denselben Platzhaltern hat.
 
 ### Neue Sprache hinzufügen
 
-1. `src/I18n.html`: ein Wörterbuch mit denselben Schlüsseln wie `de` anlegen und in `SPRACHEN` eintragen.
+1. `src/I18n_xx.html` nach dem Muster von `I18n_fr.html` anlegen (gleiche Schlüssel wie `de` in `I18n.html`) und in `Sidebar.html` einbinden.
 2. `src/Sprachen.gs`: in `BW_TEXTE` und `BW_STANDARD_ARTEN` ergänzen und in `BW_SPRACHEN` aufnehmen. Für die KI zusätzlich den Sprachnamen in `BW_KI_SPRACHEN` (`Ki.gs`) eintragen.
 3. `src/Core.html`: Monatsnamen in `MONATE` und das Wort für „Tag“ in `TAG_WOERTER` ergänzen, damit der Zeitstrahl Datumsangaben erkennt.
 
@@ -163,4 +171,6 @@ There is just one note field, and the first word decides what a note becomes:
 
 Known names (and nicknames listed under “Also called”) are linked automatically. Notes are pinned invisibly to the paragraph where your cursor is. For each card a small Google Doc is created, so `@Lena` works as a smart chip in Google Docs, even on a phone.
 
-The language follows your Google account or can be chosen under **⚙️ More → Language**. Setup works as described above: attach the `src/` files to your manuscript via **Extensions → Apps Script**, either with `clasp` or by copy and paste.
+Every note has a 📌 pin: one click pins it to the paragraph your cursor is in – or exactly to a word you have selected.
+
+Available in German, English, French, Spanish, Italian, Portuguese and Dutch. The language follows your Google account or can be chosen under **⚙️ More → Language**. Setup works as described above: attach the `src/` files to your manuscript via **Extensions → Apps Script**, either with `clasp` or by copy and paste.

@@ -5,9 +5,17 @@
  */
 
 var BW_STATISTIK = {
-  blatt: { de: 'Statistik', en: 'Statistics' },
+  blatt: { de: 'Statistik', en: 'Statistics', fr: 'Statistiques', es: 'Estadísticas', it: 'Statistiche', pt: 'Estatísticas', nl: 'Statistieken' },
   felder: ['id', 'start', 'woerter'],
-  koepfe: { de: ['Datum', 'Wörter am Morgen', 'Wörter zuletzt'], en: ['Date', 'Words in the morning', 'Words latest'] },
+  koepfe: {
+    de: ['Datum', 'Wörter am Morgen', 'Wörter zuletzt'],
+    en: ['Date', 'Words in the morning', 'Words latest'],
+    fr: ['Date', 'Mots le matin', 'Mots en dernier'],
+    es: ['Fecha', 'Palabras por la mañana', 'Palabras al final'],
+    it: ['Data', 'Parole al mattino', 'Parole alla fine'],
+    pt: ['Data', 'Palavras de manhã', 'Palavras no fim'],
+    nl: ['Datum', 'Woorden ’s ochtends', 'Woorden laatst']
+  },
   breiten: [110, 140, 140]
 };
 

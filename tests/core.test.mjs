@@ -109,6 +109,25 @@ test('Englisch: Schlüsselwörter, Daten, Titel', () => {
   assert.equal(idx.namen['Mr.'], undefined);
 });
 
+test('Weitere Sprachen: Datumsformate und Titel', () => {
+  const w = (x) => Core.parseDatum(x, 1987);
+  const maerz12 = w('12.3.1987');
+  for (const x of ['12 mars 1987', '12 de marzo de 1987', '12 marzo 1987', '12 de março de 1987', '12 maart 1987', 'el 12 de marzo']) {
+    assert.equal(w(x), maerz12, x);
+  }
+  assert.equal(w('1er avril'), w('1.4.'));
+  assert.ok(w('12 mars 9h') < w('12 mars 14h30'));
+  assert.equal(w('Jour 3'), 3);
+  assert.equal(w('Día 7'), 7);
+  assert.equal(w('agosto 1990'), 19900800);
+  const arten = [{ id: 'person', woerter: ['Personaje'], karte: true }, { id: 'zeit', woerter: ['Cuándo', 'Cuando'], karte: false }];
+  assert.equal(Core.parseNotiz('Cuándo 3 de abril: Ana llega', arten).name, '3 de abril');
+  assert.equal(Core.parseNotiz('Personaje Ana López: médica', arten).name, 'Ana López');
+  const idx = Core.baueIndex([{ id: 'a', art: 'person', name: 'Señora Ana López' }], arten);
+  assert.deepEqual(Core.findeVerweise('Ana llama a López', idx).map(v => v.text), ['Ana', 'López']);
+  assert.equal(idx.namen['Señora'], undefined);
+});
+
 test('HTML wird sicher erzeugt', () => {
   const idx = Core.baueIndex(eintraege, arten);
   const html = Core.textMitVerweisen('<b>Lena</b>', idx, { l: eintraege[0] }, { person: arten[0] });

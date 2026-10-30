@@ -3,8 +3,9 @@
  * Cursor lesen, Notizen an Textstellen heften, zu Textstellen springen,
  * Kapitel erkennen und Namen farbig markieren.
  *
- * Textstellen sind unsichtbare „benannte Bereiche“ (Named Ranges) um den
- * Absatz, an dem die Notiz entstanden ist. Sie wandern beim Schreiben mit.
+ * Textstellen sind unsichtbare „benannte Bereiche“ (Named Ranges). Sie wandern
+ * beim Schreiben mit. Ist beim Anheften Text markiert, umfasst der Bereich genau
+ * diesen Text (z. B. ein Wort), sonst den ganzen Absatz unter dem Cursor.
  * Gespeichert wird „TabId|BereichId“, damit Dokumente mit Tabs funktionieren.
  */
 
@@ -45,7 +46,10 @@ function bwCursor() {
   };
 }
 
-/** Kapitel und Reihenfolge aller angehefteten Notizen (für „Hier“ und Sortierung). */
+/**
+ * Kapitel, Reihenfolge und (bei Wort-Ankern) den Text aller angehefteten Notizen.
+ * pos: ganze Zahl = Absatz, Nachkommastellen = Position im Absatz.
+ */
 function bwTextstellen() {
   var doc = DocumentApp.getActiveDocument();
   var ergebnis = {};
@@ -59,10 +63,12 @@ function bwTextstellen() {
       var oben = oberstes_(teile[0].getElement());
       if (!oben) return;
       var index = body.getChildIndex(oben);
+      var teilweise = teile[0].isPartial();
       ergebnis[(t ? t.getId() : '') + '|' + nr.getId()] = {
         kapitel: kapitelAnIndex_(kapitelListe, index),
-        pos: tabNr * 1000000 + index,
-        tab: t ? t.getId() : ''
+        pos: tabNr * 1000000 + index + (teilweise ? Math.min(teile[0].getStartOffset(), 9999) / 10000 : 0),
+        tab: t ? t.getId() : '',
+        text: teilweise ? bereichText_(teile) : ''
       };
     });
   });
@@ -76,9 +82,15 @@ function bwZuTextstelle(anker) {
   var tab = teile[0] ? tabMitId_(doc, teile[0]) : null;
   var nr = inhalt_(doc, tab).getNamedRangeById(teile[1]);
   if (!nr) return false;
-  var el = nr.getRange().getRangeElements()[0].getElement();
+  var teile = nr.getRange().getRangeElements();
+  var el = teile[0].getElement();
   if (tab) {
     try { doc.setActiveTab(tab.getId()); } catch (err) { /* ältere Docs ohne Tabs */ }
+  }
+  if (teile[0].isPartial()) {
+    // An ein Wort geheftet: das Wort markieren, damit man sofort sieht, wo die Notiz hingehört.
+    doc.setSelection(nr.getRange());
+    return true;
   }
   var ziel = inhalt_(doc, tab);
   var position = function (e) { return ziel.newPosition ? ziel.newPosition(e, 0) : doc.newPosition(e, 0); };
@@ -93,31 +105,58 @@ function bwZuTextstelle(anker) {
   return true;
 }
 
-/** Heftet eine neue Notiz an den Absatz unter dem Cursor. */
+/**
+ * Erzeugt einen Anker an der aktuellen Stelle:
+ * markierter Text → genau dieser Text, sonst der Absatz unter dem Cursor.
+ * Ergebnis: { anker, kapitel, ankertext, pos, tab } oder null (kein Cursor im Text).
+ */
 function anheften_() {
   var doc = DocumentApp.getActiveDocument();
-  var el = null;
-  var cursor = doc.getCursor();
-  if (cursor) {
-    el = cursor.getElement();
-  } else {
-    var auswahl = doc.getSelection();
-    if (auswahl) el = auswahl.getRangeElements()[0].getElement();
-  }
-  if (!el) return null;
-  var oben = oberstes_(el);
-  if (!oben) return null; // z. B. in Kopf- oder Fußzeile
   var tab = aktivesTab_(doc);
   var inhalt = inhalt_(doc, tab);
-  var bereich = (inhalt.newRange ? inhalt.newRange() : doc.newRange()).addElement(oben).build();
-  var nr = inhalt.addNamedRange(BW_ANKER_NAME, bereich);
+  var bereich = (inhalt.newRange ? inhalt.newRange() : doc.newRange());
+  var erstes = null, ankertext = '', versatz = 0;
+  var auswahl = doc.getSelection();
+  var cursor = doc.getCursor();
+  if (auswahl) {
+    var teile = auswahl.getRangeElements().filter(function (r) { return oberstes_(r.getElement()); });
+    if (!teile.length) return null;
+    teile.forEach(function (r) {
+      if (r.isPartial()) bereich.addElement(r.getElement().asText(), r.getStartOffset(), r.getEndOffsetInclusive());
+      else bereich.addElement(r.getElement());
+    });
+    erstes = teile[0].getElement();
+    versatz = teile[0].isPartial() ? teile[0].getStartOffset() : 0;
+    ankertext = bereichText_(teile);
+  } else if (cursor) {
+    erstes = oberstes_(cursor.getElement());
+    if (!erstes) return null; // z. B. in Kopf- oder Fußzeile
+    bereich.addElement(erstes);
+  } else {
+    return null;
+  }
+  var oben = oberstes_(erstes);
+  if (!oben) return null;
+  var nr = inhalt.addNamedRange(BW_ANKER_NAME, bereich.build());
   var info = kapitelVon_(inhalt.getBody(), oben);
   return {
     anker: (tab ? tab.getId() : '') + '|' + nr.getId(),
     kapitel: info.kapitel,
-    pos: info.index,
+    ankertext: ankertext,
+    pos: info.index + Math.min(versatz, 9999) / 10000,
     tab: tab ? tab.getId() : ''
   };
+}
+
+/** Der markierte Text eines Bereichs, gekürzt auf ein paar Wörter. */
+function bereichText_(teile) {
+  var text = teile.map(function (r) {
+    var el = r.getElement();
+    if (!el.editAsText) return '';
+    var t = el.editAsText().getText();
+    return r.isPartial() ? t.slice(r.getStartOffset(), r.getEndOffsetInclusive() + 1) : t;
+  }).join(' ').replace(/\s+/g, ' ').trim();
+  return text.length > 40 ? text.slice(0, 39).trim() + '…' : text;
 }
 
 function ankerEntfernen_(anker) {

@@ -116,13 +116,52 @@
 
   function stelle(e) {
     var s = e.anker ? S.textstellen[e.anker] : null;
-    return { kapitel: s ? s.kapitel : e.kapitel, pos: s ? s.pos : null, tab: s ? s.tab : (e.anker || '').split('|')[0] };
+    return {
+      kapitel: s ? s.kapitel : e.kapitel,
+      pos: s ? s.pos : null,
+      tab: s ? s.tab : (e.anker || '').split('|')[0],
+      text: s && s.text != null ? s.text : e.ankertext
+    };
   }
 
+  /**
+   * Pin oben rechts an jeder Notiz:
+   * angeheftet → Kapitel (und Wort), Klick springt hin; sonst ein blasser Pin zum Anheften.
+   */
   function stelleKnopf(e) {
-    if (!e.anker) return '';
-    var k = stelle(e).kapitel || t('stelle');
-    return '<button class="stelle" data-stelle="' + h(e.id) + '" title="' + th('stelle.titel') + '">📌 ' + h(k) + '</button>';
+    if (e.provisorisch) return '';
+    if (!e.anker) {
+      return '<button class="pin-los" data-anheften="' + h(e.id) + '" title="' + th('pin.heften.titel') + '" aria-label="' + th('pin.heften') + '">📌</button>';
+    }
+    var s = stelle(e);
+    var k = s.kapitel || t('stelle');
+    return '<button class="stelle" data-stelle="' + h(e.id) + '" title="' + th('stelle.titel') + '">📌 ' +
+      (s.text ? '„' + h(C.ausschnitt(s.text, 18)) + '“' : h(k)) + '</button>';
+  }
+
+  /** Heftet einen Eintrag an die aktuelle Stelle im Text (markiertes Wort oder Absatz). */
+  function anheften(e) {
+    if (!e || e.provisorisch) return;
+    sichere('bwAnheften', e.id).then(function (s) {
+      if (!s) { toast(t('pin.keinCursor'), { dauer: 6000 }); return; }
+      e.anker = s.anker;
+      e.kapitel = s.kapitel;
+      e.ankertext = s.ankertext;
+      S.textstellen[s.anker] = { kapitel: s.kapitel, pos: s.pos, tab: s.tab, text: s.ankertext };
+      render();
+      toast(s.ankertext ? t('pin.anWort', { text: s.ankertext })
+        : s.kapitel ? t('pin.anAbsatz', { kapitel: s.kapitel }) : t('pin.anAbsatzOhne'));
+    });
+  }
+
+  function loesen(e) {
+    var alt = { anker: e.anker, kapitel: e.kapitel, ankertext: e.ankertext };
+    e.anker = e.kapitel = e.ankertext = '';
+    render();
+    sichere('bwLoesen', e.id).then(function () { toast(t('pin.geloest')); }, function () {
+      Object.assign(e, alt);
+      render();
+    });
   }
 
   function berechne() {
@@ -623,12 +662,13 @@
 
   function notizHtml(e) {
     var a = art(e.art);
-    var hier = S.cursor && S.filter === 'hier' && stelle(e).pos === S.cursor.pos;
-    var kopf = '<span>' + a.icon + '</span><span class="art">' + h(a.name) + '</span>';
+    var hier = S.cursor && S.filter === 'hier' && stelle(e).pos != null && Math.floor(stelle(e).pos) === S.cursor.pos;
+    // Mit Namen reicht das Symbol als Art-Kennzeichen – so bleibt Platz für den Namen.
+    var kopf = '<span title="' + h(a.name) + '">' + a.icon + '</span>' + (e.name ? '' : '<span class="art">' + h(a.name) + '</span>');
     if (istKarte(e)) {
       kopf += '<button class="ref titel" data-id="' + h(e.id) + '" style="--c:' + a.farbe + '">' + h(e.name) + '</button>';
     } else if (e.name) {
-      kopf += '<span class="titel">' + h(e.name) + '</span>';
+      kopf += '<span class="titel" style="color:' + a.farbe + '">' + h(e.name) + '</span>';
     }
     if (e.art === 'idee' && e.status && e.status !== 'offen') kopf += '<span>· ' + th('idee.status.' + e.status) + '</span>';
     var inhalt;
@@ -656,8 +696,13 @@
     var optionen = [];
     if (istKarte(e)) optionen.push({ html: th('menue.karte'), tun: function () { oeffneKarte(id); } });
     else optionen.push({ html: th('menue.bearbeiten'), tun: function () { S.bearbeiten = id; render(); var ta = $('[data-bearbeiten]'); if (ta) { ta.focus(); ta.selectionStart = ta.value.length; } } });
-    if (e.anker) optionen.push({ html: th('menue.stelle'), tun: function () { springe(e); } });
-    else optionen.push({ html: th('menue.anheften'), tun: function () { speichere(e, { anheften: true }).then(render); } });
+    if (e.anker) {
+      optionen.push({ html: th('menue.stelle'), tun: function () { springe(e); } });
+      optionen.push({ html: th('pin.neu'), tun: function () { anheften(e); } });
+      optionen.push({ html: th('pin.loesen'), tun: function () { loesen(e); } });
+    } else if (!e.provisorisch) {
+      optionen.push({ html: '📌 ' + th('pin.heften'), tun: function () { anheften(e); } });
+    }
     if (e.art === 'notiz') {
       optionen.push({ html: th('menue.pinnwand'), tun: function () { e.art = 'idee'; e.status = 'offen'; speichere(e).then(render); render(); } });
     }
@@ -1670,6 +1715,7 @@
     if ((b = z.closest('[data-id].ref, .zeile[data-id]'))) { oeffneKarte(b.dataset.id); return; }
     if ((b = z.closest('#spot'))) { if (b.dataset.id) oeffneKarte(b.dataset.id); return; }
     if ((b = z.closest('[data-stelle]'))) { springe(eintrag(b.dataset.stelle)); return; }
+    if ((b = z.closest('[data-anheften]'))) { anheften(eintrag(b.dataset.anheften)); return; }
     if ((b = z.closest('[data-menue]'))) { notizMenue(b.dataset.menue, b); return; }
     if ((b = z.closest('[data-filter]'))) {
       S.filter = b.dataset.filter;

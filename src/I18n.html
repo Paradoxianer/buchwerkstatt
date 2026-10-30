@@ -1,9 +1,11 @@
 <script>
 /**
- * Übersetzungen der Seitenleiste.
+ * Übersetzungen der Seitenleiste – hier Deutsch und Englisch, weitere Sprachen
+ * in eigenen Dateien (I18n_fr.html …), die sich mit BWI18n.registriere anmelden.
  *
- * Neue Sprache: ein weiteres Wörterbuch unten anlegen (gleiche Schlüssel wie „de“),
- * in SPRACHEN eintragen und in Sprachen.gs die Standard-Arten ergänzen.
+ * Neue Sprache: I18n_xx.html nach dem Muster einer vorhandenen anlegen
+ * (gleiche Schlüssel wie „de“), in Sidebar.html einbinden und in Sprachen.gs
+ * die Server-Texte und Standard-Arten ergänzen.
  * Fehlt ein Text, wird der englische (dann der deutsche) genommen.
  * Platzhalter: {name}. Texte enthalten kein HTML – sie werden beim Einsetzen maskiert.
  */
@@ -12,6 +14,12 @@ var BWI18n = (function () {
     { id: 'de', name: 'Deutsch', locale: 'de-DE' },
     { id: 'en', name: 'English', locale: 'en-GB' }
   ];
+
+  /** Weitere Sprache anmelden (aus I18n_xx.html). */
+  function registriere(sprache, texte) {
+    SPRACHEN.push(sprache);
+    T[sprache.id] = texte;
+  }
 
   var T = {
     de: {
@@ -40,6 +48,15 @@ var BWI18n = (function () {
       'neu.beispiel': '{wort} Lena: 34, Hebamme',
       'neu.aria': 'Neue Notiz',
       'pin.titel': 'An die Textstelle heften, an der der Cursor steht',
+      'pin.heften': 'An Textstelle heften',
+      'pin.heften.titel': 'Heftet die Notiz an den Absatz, in dem dein Cursor steht. Ist im Text ein Wort markiert, genau an dieses Wort.',
+      'pin.anWort': '📌 Angeheftet an „{text}“',
+      'pin.anAbsatz': '📌 Angeheftet an einen Absatz in „{kapitel}“',
+      'pin.anAbsatzOhne': '📌 An den Absatz geheftet',
+      'pin.keinCursor': 'Klicke zuerst in deinen Text – oder markiere ein Wort, um die Notiz genau daran zu heften.',
+      'pin.neu': '📌 Neu anheften (Cursor oder Markierung)',
+      'pin.loesen': '✂️ Vom Text lösen',
+      'pin.geloest': 'Vom Text gelöst',
       'pin.an': '📌 Neue Notizen werden an die Cursor-Stelle geheftet.',
       'pin.aus': 'Neue Notizen werden nicht angeheftet.',
       'speichern': 'Speichern',
@@ -50,7 +67,7 @@ var BWI18n = (function () {
       'hilfe.person': 'neue Figur', 'hilfe.ort': 'neuer Ort', 'hilfe.ding': 'Gegenstand', 'hilfe.zeit': 'Zeitstrahl', 'hilfe.idee': 'Pinnwand',
       'hilfe.at': 'verweist auf eine Karte',
       'hilfe.bsp.person': 'Lena', 'hilfe.bsp.ort': 'Hafen', 'hilfe.bsp.ding': 'Taschenuhr', 'hilfe.bsp.zeit': '12. März',
-      'hilfe.ende': 'Bekannte Namen werden automatisch verlinkt. 📌 heftet die Notiz an die Stelle im Text, an der dein Cursor steht.',
+      'hilfe.ende': 'Bekannte Namen werden automatisch verlinkt. Mit 📌 an einer Notiz heftest du sie an den Absatz, in dem dein Cursor steht – oder an ein Wort, das du im Text markiert hast.',
       'hilfe.aus': 'Ausblenden',
       'liste.klick': 'Klicke in deinen Text – dann erscheinen hier die Notizen zu diesem Kapitel.',
       'liste.leerHier': 'Zu „{kapitel}“ gibt es noch keine Notizen.',
@@ -58,7 +75,7 @@ var BWI18n = (function () {
       'liste.leer': 'Noch keine Notizen. Schreib oben einfach los!',
       'liste.nichts': 'Nichts gefunden für „{q}“.',
       'menue.karte': '🗂️ Karte öffnen', 'menue.bearbeiten': '✏️ Bearbeiten', 'menue.stelle': '📌 Zur Textstelle',
-      'menue.anheften': '📌 An Cursor-Stelle heften', 'menue.pinnwand': '💡 Zur Pinnwand (als Idee)', 'menue.loeschen': '🗑️ Löschen',
+'menue.pinnwand': '💡 Zur Pinnwand (als Idee)', 'menue.loeschen': '🗑️ Löschen',
       'vorschau.tipp': '⏎ speichert · ⇧⏎ neue Zeile',
       'vorschau.angeheftet': '📌 wird angeheftet an {kapitel}',
       'vorschau.nameFehlt': 'Name fehlt',
@@ -268,6 +285,15 @@ var BWI18n = (function () {
       'neu.beispiel': '{wort} Lena: 34, midwife',
       'neu.aria': 'New note',
       'pin.titel': 'Pin to the passage where your cursor is',
+      'pin.heften': 'Pin to text',
+      'pin.heften.titel': 'Pins the note to the paragraph your cursor is in. If a word is selected in the text, exactly to that word.',
+      'pin.anWort': '📌 Pinned to “{text}”',
+      'pin.anAbsatz': '📌 Pinned to a paragraph in “{kapitel}”',
+      'pin.anAbsatzOhne': '📌 Pinned to the paragraph',
+      'pin.keinCursor': 'Click into your text first – or select a word to pin the note exactly to it.',
+      'pin.neu': '📌 Pin again (cursor or selection)',
+      'pin.loesen': '✂️ Unpin from text',
+      'pin.geloest': 'Unpinned from text',
       'pin.an': '📌 New notes are pinned to the cursor position.',
       'pin.aus': 'New notes are not pinned.',
       'speichern': 'Save',
@@ -278,7 +304,7 @@ var BWI18n = (function () {
       'hilfe.person': 'new character', 'hilfe.ort': 'new place', 'hilfe.ding': 'object', 'hilfe.zeit': 'timeline', 'hilfe.idee': 'idea board',
       'hilfe.at': 'refers to a card',
       'hilfe.bsp.person': 'Lena', 'hilfe.bsp.ort': 'Harbour', 'hilfe.bsp.ding': 'Pocket watch', 'hilfe.bsp.zeit': 'March 12',
-      'hilfe.ende': 'Known names are linked automatically. 📌 pins the note to the spot in your text where your cursor is.',
+      'hilfe.ende': 'Known names are linked automatically. Use 📌 on a note to pin it to the paragraph your cursor is in – or to a word you have selected in the text.',
       'hilfe.aus': 'Hide',
       'liste.klick': 'Click into your text – the notes for that chapter will appear here.',
       'liste.leerHier': 'No notes for “{kapitel}” yet.',
@@ -286,7 +312,7 @@ var BWI18n = (function () {
       'liste.leer': 'No notes yet. Just start writing above!',
       'liste.nichts': 'Nothing found for “{q}”.',
       'menue.karte': '🗂️ Open card', 'menue.bearbeiten': '✏️ Edit', 'menue.stelle': '📌 Go to passage',
-      'menue.anheften': '📌 Pin to cursor position', 'menue.pinnwand': '💡 Move to idea board', 'menue.loeschen': '🗑️ Delete',
+'menue.pinnwand': '💡 Move to idea board', 'menue.loeschen': '🗑️ Delete',
       'vorschau.tipp': '⏎ saves · ⇧⏎ new line',
       'vorschau.angeheftet': '📌 will be pinned to {kapitel}',
       'vorschau.nameFehlt': 'name missing',
@@ -498,6 +524,7 @@ var BWI18n = (function () {
 
   return {
     SPRACHEN: SPRACHEN,
+    registriere: registriere,
     t: t,
     setze: setze,
     sprache: function () { return aktuell; },

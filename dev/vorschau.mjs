@@ -6,7 +6,8 @@ const src = new URL('../src/', import.meta.url);
 const lies = (name) => readFileSync(new URL(name, src), 'utf8');
 
 let html = lies('Sidebar.html').replace(/<\?!=\s*include\('(\w+)'\);?\s*\?>/g, (_, name) => lies(name + '.html'));
-const mock = readFileSync(new URL('./mock.js', import.meta.url), 'utf8');
+// Sprachen.gs liefert der Attrappe die Standard-Schlüsselwörter aller Sprachen.
+const mock = lies('Sprachen.gs') + '\n' + readFileSync(new URL('./mock.js', import.meta.url), 'utf8');
 html = html.replace('<body>', () => '<body style="width:300px;margin:0 auto;border-left:1px solid #ddd;border-right:1px solid #ddd">\n<script>' + mock + '</script>');
 
 mkdirSync(new URL('../dist/', import.meta.url), { recursive: true });

@@ -11,8 +11,14 @@ var BWCore = (function () {
   var BUCHSTABE = /[\p{L}\p{N}_]/u;
   // Teile von Namen, die allein kein Name sind („Herr Kowalski“ → nicht „Herr“).
   var NAMENS_FUELLWOERTER = ['von', 'van', 'de', 'der', 'die', 'das', 'den', 'la', 'le', 'du', 'zu', 'und', 'of', 'the', 'and',
+    'del', 'della', 'di', 'da', 'do', 'dos', 'das', 'het', 'ten', 'ter', 'et', 'y', 'e',
     'Herr', 'Frau', 'Dr.', 'Doktor', 'Onkel', 'Tante', 'Opa', 'Oma', 'Mr.', 'Mrs.', 'Ms.', 'Miss', 'Sir', 'Lady', 'Lord',
-    'Uncle', 'Aunt', 'The', 'Der', 'Die', 'Das'];
+    'Uncle', 'Aunt', 'The', 'Der', 'Die', 'Das',
+    'M.', 'Mme', 'Mlle', 'Monsieur', 'Madame', 'Mademoiselle', 'Le', 'La', 'Les',
+    'Don', 'Doña', 'Señor', 'Señora', 'Señorita', 'Sr.', 'Sra.', 'El', 'Los', 'Las',
+    'Signor', 'Signora', 'Signorina', 'Sig.', 'Il', 'Lo', 'Gli',
+    'Dona', 'Senhor', 'Senhora', 'O', 'A', 'Os', 'As',
+    'Meneer', 'Mevrouw', 'Dhr.', 'Mevr.', 'De', 'Het', 'Van'];
 
   var NOTIZ_ART = { id: 'notiz', name: 'Notiz', mehrzahl: 'Notizen', icon: '📝', farbe: '#5f6368', hell: '#eceff1', woerter: [], karte: false, felder: [] };
 
@@ -44,22 +50,23 @@ var BWCore = (function () {
   /* Notiz zerlegen                                                    */
   /* ---------------------------------------------------------------- */
 
-  // Monatsnamen in allen unterstützten Sprachen (Deutsch, Englisch).
-  var MONATE = {
-    jan: 1, januar: 1, 'jänner': 1, january: 1,
-    feb: 2, februar: 2, february: 2,
-    'mär': 3, 'märz': 3, maerz: 3, mrz: 3, mar: 3, march: 3,
-    apr: 4, april: 4,
-    mai: 5, may: 5,
-    jun: 6, juni: 6, june: 6,
-    jul: 7, juli: 7, july: 7,
-    aug: 8, august: 8,
-    sep: 9, sept: 9, september: 9,
-    okt: 10, oktober: 10, oct: 10, october: 10,
-    nov: 11, november: 11,
-    dez: 12, dezember: 12, dec: 12, december: 12
-  };
-  var TAG_WOERTER = ['tag', 'day'];
+  // Monatsnamen in allen unterstützten Sprachen (de, en, fr, es, it, pt, nl).
+  var MONATE = {};
+  [
+    [1, 'jan januar jänner january janvier enero ene gennaio gen janeiro januari'],
+    [2, 'feb februar february février fevrier févr febrero febbraio fevereiro fev februari'],
+    [3, 'mär märz maerz mrz mar march mars marzo março marco maart mrt'],
+    [4, 'apr april avril abril abr aprile'],
+    [5, 'mai may mayo maggio mag maio mei'],
+    [6, 'jun juni june juin junio giugno giu junho'],
+    [7, 'jul juli july juillet juil julio luglio lug julho'],
+    [8, 'aug august août aout agosto ago augustus'],
+    [9, 'sep sept september septembre septiembre setiembre settembre setembro'],
+    [10, 'okt oktober oct october octobre octubre ottobre ott outubro'],
+    [11, 'nov november novembre noviembre novembro'],
+    [12, 'dez dezember dec december décembre decembre diciembre dic dicembre dezembro']
+  ].forEach(function (m) { m[1].split(' ').forEach(function (w) { MONATE[w] = m[0]; }); });
+  var TAG_WOERTER = ['tag', 'day', 'jour', 'día', 'dia', 'giorno', 'dag'];
 
   function siehtAusWieName(name) {
     var woerter = name.split(/\s+/).filter(Boolean);
@@ -255,7 +262,7 @@ var BWCore = (function () {
     var s = String(eingabe || '').toLowerCase().trim();
     if (!s) return null;
     var uhr = 0;
-    var mu = s.match(/(\d{1,2}):(\d{2})\s*(am|pm)?/) || s.match(/(\d{1,2})(?:[.:](\d{2}))?\s*(uhr|am|pm)/);
+    var mu = s.match(/(\d{1,2})[:h](\d{2})\s*(am|pm)?/) || s.match(/(\d{1,2})(?:[.:](\d{2}))?\s*(uhr|am|pm|h\b)/);
     if (mu) {
       var stunde = Number(mu[1]) % (mu[3] === 'am' || mu[3] === 'pm' ? 12 : 24) + (mu[3] === 'pm' ? 12 : 0);
       uhr = (stunde * 60 + Number(mu[2] || 0)) / 1440;
@@ -266,8 +273,8 @@ var BWCore = (function () {
     if ((m = s.match(/(\d{1,2})\.\s*(\d{1,2})\.(?:\s*(\d{2,4}))?/))) {
       return jahr(m[3], standardJahr) * 10000 + Number(m[2]) * 100 + Number(m[1]) + uhr;
     }
-    // „12. März 1987“, „12 March 1987“, „12th of March“
-    if ((m = s.match(/(\d{1,2})(?:\.|st|nd|rd|th)?\s*(?:of\s+)?(\p{L}+)\.?,?(?:\s+(\d{2,4}))?/u)) && MONATE[m[2]]) {
+    // „12. März 1987“, „12 March 1987“, „12th of March“, „1er mars“, „12 de marzo de 1987“
+    if ((m = s.match(/(\d{1,2})(?:\.|st|nd|rd|th|er|º|°)?\s*(?:(?:of|de|del|di)\s+)?(\p{L}+)\.?,?(?:\s+(?:(?:de|del)\s+)?(\d{2,4}))?/u)) && MONATE[m[2]]) {
       return jahr(m[3], standardJahr) * 10000 + MONATE[m[2]] * 100 + Number(m[1]) + uhr;
     }
     // „March 12, 1987“, „March 12th“

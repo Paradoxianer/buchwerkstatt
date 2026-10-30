@@ -16,19 +16,32 @@ var BW_PROP_EINST = 'BW_EINSTELLUNGEN';
 var BW_PROP_ORDNER = 'BW_ORDNER';
 
 var BW_EINTRAG = {
-  blatt: { de: 'Einträge', en: 'Entries' },
-  felder: ['id', 'art', 'name', 'aliase', 'text', 'felder', 'bezug', 'status', 'anker', 'kapitel', 'blatt', 'erstellt', 'geaendert'],
+  blatt: { de: 'Einträge', en: 'Entries', fr: 'Entrées', es: 'Entradas', it: 'Voci', pt: 'Entradas', nl: 'Items' },
+  felder: ['id', 'art', 'name', 'aliase', 'text', 'felder', 'bezug', 'status', 'anker', 'kapitel', 'blatt', 'erstellt', 'geaendert', 'ankertext'],
   koepfe: {
-    de: ['ID', 'Art', 'Name', 'Auch genannt', 'Text', 'Felder', 'Bezug', 'Status', 'Textstelle', 'Kapitel', 'Blatt', 'Erstellt', 'Geändert'],
-    en: ['ID', 'Type', 'Name', 'Also called', 'Text', 'Fields', 'Linked to', 'Status', 'Passage', 'Chapter', 'Document', 'Created', 'Changed']
+    de: ['ID', 'Art', 'Name', 'Auch genannt', 'Text', 'Felder', 'Bezug', 'Status', 'Textstelle', 'Kapitel', 'Blatt', 'Erstellt', 'Geändert', 'Angeheftet an'],
+    en: ['ID', 'Type', 'Name', 'Also called', 'Text', 'Fields', 'Linked to', 'Status', 'Passage', 'Chapter', 'Document', 'Created', 'Changed', 'Pinned to'],
+    fr: ['ID', 'Type', 'Nom', 'Aussi appelé', 'Texte', 'Champs', 'Lié à', 'Statut', 'Passage', 'Chapitre', 'Document', 'Créé', 'Modifié', 'Épinglé à'],
+    es: ['ID', 'Tipo', 'Nombre', 'También llamado', 'Texto', 'Campos', 'Vinculado a', 'Estado', 'Pasaje', 'Capítulo', 'Documento', 'Creado', 'Modificado', 'Fijado a'],
+    it: ['ID', 'Tipo', 'Nome', 'Detto anche', 'Testo', 'Campi', 'Collegato a', 'Stato', 'Passaggio', 'Capitolo', 'Documento', 'Creato', 'Modificato', 'Fissato a'],
+    pt: ['ID', 'Tipo', 'Nome', 'Também chamado', 'Texto', 'Campos', 'Ligado a', 'Estado', 'Passagem', 'Capítulo', 'Documento', 'Criado', 'Alterado', 'Fixado em'],
+    nl: ['ID', 'Soort', 'Naam', 'Ook genoemd', 'Tekst', 'Velden', 'Gekoppeld aan', 'Status', 'Passage', 'Hoofdstuk', 'Document', 'Gemaakt', 'Gewijzigd', 'Vastgemaakt aan']
   },
-  breiten: [90, 80, 160, 160, 360, 260, 90, 80, 90, 160, 90, 120, 120]
+  breiten: [90, 80, 160, 160, 360, 260, 90, 80, 90, 160, 90, 120, 120, 140]
 };
 
 var BW_BEZIEHUNG = {
-  blatt: { de: 'Beziehungen', en: 'Relationships' },
+  blatt: { de: 'Beziehungen', en: 'Relationships', fr: 'Relations', es: 'Relaciones', it: 'Relazioni', pt: 'Relações', nl: 'Relaties' },
   felder: ['id', 'von', 'nach', 'art'],
-  koepfe: { de: ['ID', 'Von', 'Nach', 'Beziehung'], en: ['ID', 'From', 'To', 'Relationship'] },
+  koepfe: {
+    de: ['ID', 'Von', 'Nach', 'Beziehung'],
+    en: ['ID', 'From', 'To', 'Relationship'],
+    fr: ['ID', 'De', 'À', 'Relation'],
+    es: ['ID', 'De', 'A', 'Relación'],
+    it: ['ID', 'Da', 'A', 'Relazione'],
+    pt: ['ID', 'De', 'Para', 'Relação'],
+    nl: ['ID', 'Van', 'Naar', 'Relatie']
+  },
   breiten: [90, 90, 90, 200]
 };
 
@@ -93,7 +106,8 @@ function bwSpeichern(eintrag, optionen) {
       kapitel: eintrag.kapitel || '',
       blatt: eintrag.blatt || '',
       erstellt: eintrag.erstellt || jetzt,
-      geaendert: jetzt
+      geaendert: jetzt,
+      ankertext: eintrag.ankertext || ''
     };
     var stelle = null;
     if (optionen.anheften && !e.anker) {
@@ -101,6 +115,7 @@ function bwSpeichern(eintrag, optionen) {
       if (stelle) {
         e.anker = stelle.anker;
         e.kapitel = stelle.kapitel;
+        e.ankertext = stelle.ankertext;
       }
     }
     schreibeZeile_(sheet, BW_EINTRAG, eintragZuZeile_(e));
@@ -134,6 +149,50 @@ function bwLoeschen(id) {
     liesTabelle_(bez, BW_BEZIEHUNG).forEach(function (b) {
       if (b.von === id || b.nach === id) loescheZeile_(bez, BW_BEZIEHUNG, b.id);
     });
+    return true;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * Heftet einen Eintrag (neu) an die aktuelle Stelle im Text – an das markierte
+ * Wort oder den Absatz unter dem Cursor. Ein alter Anker wird entfernt.
+ * Ergebnis: { anker, kapitel, ankertext, pos, tab } oder null, wenn kein Cursor im Text steht.
+ */
+function bwAnheften(id) {
+  var lock = LockService.getDocumentLock();
+  lock.waitLock(20000);
+  try {
+    var sheet = blatt_(datenbank_(), BW_EINTRAG);
+    var zeile = liesTabelle_(sheet, BW_EINTRAG).filter(function (z) { return z.id === id; })[0];
+    if (!zeile) return null;
+    var stelle = anheften_();
+    if (!stelle) return null;
+    if (zeile.anker) ankerEntfernen_(zeile.anker);
+    zeile.anker = stelle.anker;
+    zeile.kapitel = stelle.kapitel;
+    zeile.ankertext = stelle.ankertext;
+    zeile.geaendert = zeitstempel_();
+    schreibeZeile_(sheet, BW_EINTRAG, zeile);
+    return stelle;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/** Löst einen Eintrag vom Text (der Anker im Dokument verschwindet). */
+function bwLoesen(id) {
+  var lock = LockService.getDocumentLock();
+  lock.waitLock(20000);
+  try {
+    var sheet = blatt_(datenbank_(), BW_EINTRAG);
+    var zeile = liesTabelle_(sheet, BW_EINTRAG).filter(function (z) { return z.id === id; })[0];
+    if (!zeile) return false;
+    if (zeile.anker) ankerEntfernen_(zeile.anker);
+    zeile.anker = zeile.kapitel = zeile.ankertext = '';
+    zeile.geaendert = zeitstempel_();
+    schreibeZeile_(sheet, BW_EINTRAG, zeile);
     return true;
   } finally {
     lock.releaseLock();
@@ -325,7 +384,8 @@ function eintragZuZeile_(e) {
     kapitel: e.kapitel,
     blatt: e.blatt,
     erstellt: e.erstellt,
-    geaendert: e.geaendert
+    geaendert: e.geaendert,
+    ankertext: e.ankertext || ''
   };
 }
 
@@ -343,7 +403,8 @@ function eintragAusZeile_(z) {
     kapitel: z.kapitel,
     blatt: z.blatt,
     erstellt: z.erstellt,
-    geaendert: z.geaendert
+    geaendert: z.geaendert,
+    ankertext: z.ankertext || ''
   };
 }
 
