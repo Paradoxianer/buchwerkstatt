@@ -34,6 +34,7 @@ grep -n "platzhalter" docs/*.html
 | Startseite | `https://paradoxianer.github.io/buchwerkstatt/` |
 | Datenschutz | `https://paradoxianer.github.io/buchwerkstatt/datenschutz.html` |
 | Nutzungsbedingungen | `https://paradoxianer.github.io/buchwerkstatt/nutzungsbedingungen.html` |
+| Abmelde-/Deinstallations-URL (falls verlangt) | `https://paradoxianer.github.io/buchwerkstatt/deinstallieren.html` |
 | Hilfe | `https://github.com/Paradoxianer/buchwerkstatt/issues` |
 
 **c) Domain bestätigen.** Google verlangt, dass die Domain von Startseite und Datenschutzerklärung dir nachweislich gehört. Das geschieht in der [Google Search Console](https://search.google.com/search-console) mit demselben Google-Konto, das später das Cloud-Projekt besitzt.
@@ -88,6 +89,7 @@ Cloud Console → **APIs & Dienste → OAuth-Zustimmungsbildschirm** (in neueren
 | Startseite | `https://paradoxianer.github.io/buchwerkstatt/` |
 | Datenschutzerklärung | `https://paradoxianer.github.io/buchwerkstatt/datenschutz.html` |
 | Nutzungsbedingungen | `https://paradoxianer.github.io/buchwerkstatt/nutzungsbedingungen.html` |
+| Abmelde-/Deinstallations-URL (falls verlangt) | `https://paradoxianer.github.io/buchwerkstatt/deinstallieren.html` |
 | Autorisierte Domain | `paradoxianer.github.io` (bzw. eigene Domain) |
 | Kontakt des Entwicklers | deine E-Mail |
 
