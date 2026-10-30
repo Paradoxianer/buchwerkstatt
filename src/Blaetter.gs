@@ -24,9 +24,16 @@ function bwBlaetterSync(blaetter) {
 
   // 1. Jede Karte bekommt ein Dokument (fehlende anlegen, umbenannte umbenennen).
   blaetter.forEach(function (b) {
-    var info = dateiInfo_(blattVon[b.id] || b.blattId);
+    var bisher = blattVon[b.id] || b.blattId;
+    var info = dateiInfo_(bisher);
     var id;
-    if (!info || info.trashed) {
+    if (!info && bisher && dokumentDa_(bisher)) {
+      // Drive sieht das Blatt nicht, weil es jemand anderes angelegt hat (beim
+      // gemeinsamen Schreiben) – öffnen lässt es sich aber: weiterverwenden.
+      id = bisher;
+      var fremd = DocumentApp.openById(id);
+      if (fremd.getName() !== b.titel) fremd.setName(b.titel);
+    } else if (!info || info.trashed) {
       ordner = ordner || weltOrdner_();
       id = DocumentApp.create(b.titel).getId();
       dateiVerschieben_(id, ordner);
@@ -59,6 +66,15 @@ function bwBlaetterSync(blaetter) {
   });
   if (fehler.length) throw new Error(fehler.join('\n'));
   return ergebnis;
+}
+
+function dokumentDa_(id) {
+  try {
+    DocumentApp.openById(id);
+    return true;
+  } catch (err) {
+    return false;
+  }
 }
 
 function schreibeBlatt_(docId, b, blattVon) {

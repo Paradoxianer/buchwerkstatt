@@ -2030,9 +2030,25 @@
       setInterval(ladeTextstellen, 60000);
       setInterval(ladeStatistik, 300000);
     }, function (err) {
-      $('#ansicht').innerHTML = '<div class="leer"><div class="gross">😕</div>' + th('laden.fehler') + '<br><small>' + h(fehlertext(err)) + '</small><br><br><button class="knopf" onclick="location.reload()">' + th('nochmal') + '</button></div>';
+      var text = fehlertext(err);
+      if (text.indexOf(BW_KEIN_ZUGRIFF) >= 0) { keinZugriff(text.replace(BW_KEIN_ZUGRIFF, '')); return; }
+      $('#ansicht').innerHTML = '<div class="leer"><div class="gross">😕</div>' + th('laden.fehler') + '<br><small>' + h(text) + '</small><br><br><button class="knopf" onclick="location.reload()">' + th('nochmal') + '</button></div>';
     });
     window.addEventListener('beforeunload', function () { if (Object.keys(S.blaetterOffen).length) blaetterSenden(); });
+  }
+
+  /** Die Tabelle des Buchs gehört jemand anderem und ist nicht freigegeben. */
+  var BW_KEIN_ZUGRIFF = '[BW-ZUGRIFF] ';
+  function keinZugriff(text) {
+    var el = $('#ansicht');
+    el.innerHTML = '<div class="leer"><div class="gross">🔒</div>' + h(text) +
+      '<br><br><button class="knopf primaer" onclick="location.reload()">' + th('nochmal') + '</button>' +
+      '<details class="notfall"><summary>' + th('zugriff.neu') + '</summary><p>' + th('zugriff.neuInfo') + '</p>' +
+      '<button class="knopf gefahr" id="tabelle-neu">' + th('zugriff.neuJa') + '</button></details></div>';
+    $('#tabelle-neu').onclick = function () {
+      this.disabled = true;
+      rufe('bwTabelleNeuAnlegen').then(function () { location.reload(); }, function (err) { toast(fehlertext(err), { fehler: true }); });
+    };
   }
 
   start();

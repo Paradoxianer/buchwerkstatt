@@ -90,7 +90,10 @@ function welt() {
     ElementType: { BODY_SECTION: 'BODY', PARAGRAPH: 'P', TEXT: 'T' },
     getActiveDocument: () => ({ getId: () => manuskriptId, getName: () => 'Roman' }),
     create(titel) { const id = datei(titel, 'doc'); docs[id] = [{ text: '', heading: 'NORMAL', links: [] }]; return { getId: () => id }; },
-    openById(id) { return { getBody: () => body(docs[id]), saveAndClose() {} }; }
+    openById(id) {
+      if (!docs[id]) throw new Error('nicht gefunden');
+      return { getBody: () => body(docs[id]), saveAndClose() {}, getName: () => dateien[id].name, setName(n) { dateien[id].name = n; } };
+    }
   };
 
   const tabellen = {};
@@ -147,8 +150,8 @@ function welt() {
     CacheService: { getDocumentCache: () => cache }
   };
   const namen = Object.keys(globals);
-  const fns = new Function(...namen, code + '; return { bwSpeichern, bwBlaetterSync, bwLoeschen, bwLaden, datenbank_, bwFelderSetzen, bwEintraegeLesen, bwEinstellungenSpeichern, bwObenSetzen, einstellungen_, fragebogen_, kurzeFelder_, neueAusfuehrung: function () { bwCacheDb_ = null; bwCacheSprache_ = null; } };')(...namen.map((n) => globals[n]));
-  return { fns, dateien, docs, dokProps, zugriff };
+  const fns = new Function(...namen, code + '; return { bwSpeichern, bwBlaetterSync, bwLoeschen, bwLaden, datenbank_, bwFelderSetzen, bwEintraegeLesen, bwEinstellungenSpeichern, bwObenSetzen, bwTabelleNeuAnlegen, einstellungen_, fragebogen_, kurzeFelder_, neueAusfuehrung: function () { bwCacheDb_ = null; bwCacheSprache_ = null; } };')(...namen.map((n) => globals[n]));
+  return { fns, dateien, docs, dokProps, zugriff, tabellen };
 }
 
 test('Tabelle und Ordner werden angelegt, auch ohne Zugriff auf den Ordner des Manuskripts', () => {
@@ -263,4 +266,40 @@ test('Stern-Felder aus dem großen Fenster: nur die Art ändern und der Seitenle
   assert.equal(nachher.tagesziel, 777, 'übrige Einstellungen bleiben');
   assert.deepEqual(nachher.arten.find((a) => a.id === 'person').felder, fns.fragebogen_('de', 'person'), 'Fragebogen bleibt');
   assert.deepEqual(fns.bwLaden().fensterStand.oben, { person: ['Alter', 'Eltern'] });
+});
+
+test('Kein Zugriff auf die Tabelle (fremdes Buch): klare Meldung statt still neuer Tabelle', () => {
+  const { fns, dokProps, zugriff, tabellen } = welt();
+  fns.bwSpeichern({ art: 'notiz', text: 'Notiz der Besitzerin' }, {});
+  const id = dokProps.getProperty('BW_DATENBANK');
+  // Mitschreibende Person: Drive sieht die Tabelle nicht, öffnen darf sie sie auch nicht
+  zugriff.delete(id);
+  const tabelle = tabellen[id];
+  delete tabellen[id];
+  fns.neueAusfuehrung();
+  assert.throws(() => fns.bwLaden(), /\[BW-ZUGRIFF\].*Roman – Buchwerkstatt/);
+  assert.equal(dokProps.getProperty('BW_DATENBANK'), id, 'Verweis auf die richtige Tabelle bleibt');
+  // Nach der Freigabe geht es weiter wie gehabt
+  tabellen[id] = tabelle;
+  fns.neueAusfuehrung();
+  assert.equal(fns.bwLaden().eintraege.length, 1);
+  // Notausgang: bewusst neu anfangen
+  delete tabellen[id];
+  fns.neueAusfuehrung();
+  fns.bwTabelleNeuAnlegen();
+  assert.notEqual(dokProps.getProperty('BW_DATENBANK'), id);
+  assert.equal(fns.bwLaden().eintraege.length, 0);
+});
+
+test('Personenblätter beim gemeinsamen Schreiben: fremdes Blatt weiterverwenden statt doppelt anlegen', () => {
+  const { fns, dateien, zugriff } = welt();
+  const lena = fns.bwSpeichern({ art: 'person', name: 'Lena', text: '', felder: {} }, {});
+  const blatt = (name) => ({ id: lena.id, titel: name, abschnitte: [] });
+  const id = fns.bwBlaetterSync([blatt('Lena')])[lena.id];
+  zugriff.delete(id); // jemand anderes legte das Blatt an: Drive sieht es nicht
+  fns.neueAusfuehrung();
+  const anzahl = Object.keys(dateien).length;
+  assert.equal(fns.bwBlaetterSync([blatt('Lena Berger')])[lena.id], id, 'dasselbe Blatt');
+  assert.equal(Object.keys(dateien).length, anzahl, 'kein neues Dokument');
+  assert.equal(dateien[id].name, 'Lena Berger', 'umbenannt');
 });

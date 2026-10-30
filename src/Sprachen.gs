@@ -22,7 +22,8 @@ var BW_TEXTE = {
     ki401: 'Der API-Schlüssel wurde nicht akzeptiert. Bitte in den Einstellungen prüfen.',
     kiAusgelastet: 'Die KI ist gerade ausgelastet. Bitte gleich noch einmal versuchen.',
     kiAbgelehnt: 'Die Anfrage wurde abgelehnt.',
-    kiZuLang: 'Die Antwort war zu lang. Bitte mit weniger Text versuchen.'
+    kiZuLang: 'Die Antwort war zu lang. Bitte mit weniger Text versuchen.',
+    keinZugriff: 'Kein Zugriff auf die Tabelle dieses Buchs. Sie gehört wohl jemand anderem. Bitte den Ordner „{ordner}“ in Google Drive für dich freigeben lassen (Bearbeiten) und dann neu laden.'
   },
   en: {
     sprachName: 'English',
@@ -35,7 +36,8 @@ var BW_TEXTE = {
     ki401: 'The API key was not accepted. Please check it in the settings.',
     kiAusgelastet: 'The AI is busy right now. Please try again in a moment.',
     kiAbgelehnt: 'The request was declined.',
-    kiZuLang: 'The answer was too long. Please try with less text.'
+    kiZuLang: 'The answer was too long. Please try with less text.',
+    keinZugriff: 'No access to this book’s spreadsheet – it probably belongs to someone else. Please ask them to share the folder “{ordner}” in Google Drive with you (Editor), then reload.'
   },
   fr: {
     sprachName: 'Français',
@@ -48,7 +50,8 @@ var BW_TEXTE = {
     ki401: 'La clé API n’a pas été acceptée. Veuillez la vérifier dans les réglages.',
     kiAusgelastet: 'L’IA est très sollicitée en ce moment. Veuillez réessayer dans un instant.',
     kiAbgelehnt: 'La demande a été refusée.',
-    kiZuLang: 'La réponse était trop longue. Veuillez réessayer avec moins de texte.'
+    kiZuLang: 'La réponse était trop longue. Veuillez réessayer avec moins de texte.',
+    keinZugriff: 'Pas d’accès au tableur de ce livre – il appartient sans doute à quelqu’un d’autre. Demande-lui de partager avec toi le dossier « {ordner} » dans Google Drive (Éditeur), puis recharge.'
   },
   es: {
     sprachName: 'Español',
@@ -61,7 +64,8 @@ var BW_TEXTE = {
     ki401: 'La clave API no fue aceptada. Revísala en los ajustes.',
     kiAusgelastet: 'La IA está saturada en este momento. Inténtalo de nuevo en un momento.',
     kiAbgelehnt: 'La solicitud fue rechazada.',
-    kiZuLang: 'La respuesta fue demasiado larga. Inténtalo con menos texto.'
+    kiZuLang: 'La respuesta fue demasiado larga. Inténtalo con menos texto.',
+    keinZugriff: 'No tienes acceso a la hoja de cálculo de este libro; seguramente pertenece a otra persona. Pídele que comparta contigo la carpeta «{ordner}» en Google Drive (Editor) y vuelve a cargar.'
   },
   it: {
     sprachName: 'Italiano',
@@ -74,7 +78,8 @@ var BW_TEXTE = {
     ki401: 'La chiave API non è stata accettata. Controllala nelle impostazioni.',
     kiAusgelastet: 'L’IA è occupata in questo momento. Riprova tra poco.',
     kiAbgelehnt: 'La richiesta è stata rifiutata.',
-    kiZuLang: 'La risposta era troppo lunga. Riprova con meno testo.'
+    kiZuLang: 'La risposta era troppo lunga. Riprova con meno testo.',
+    keinZugriff: 'Nessun accesso al foglio di questo libro: probabilmente appartiene a qualcun altro. Chiedi di condividere con te la cartella «{ordner}» in Google Drive (Editor), poi ricarica.'
   },
   pt: {
     sprachName: 'Português',
@@ -87,7 +92,8 @@ var BW_TEXTE = {
     ki401: 'A chave API não foi aceita. Verifique-a nas configurações.',
     kiAusgelastet: 'A IA está sobrecarregada agora. Tente novamente em instantes.',
     kiAbgelehnt: 'O pedido foi recusado.',
-    kiZuLang: 'A resposta foi longa demais. Tente com menos texto.'
+    kiZuLang: 'A resposta foi longa demais. Tente com menos texto.',
+    keinZugriff: 'Sem acesso à folha de cálculo deste livro – provavelmente pertence a outra pessoa. Pede que partilhem contigo a pasta «{ordner}» no Google Drive (Editor) e volta a carregar.'
   },
   nl: {
     sprachName: 'Nederlands',
@@ -100,7 +106,8 @@ var BW_TEXTE = {
     ki401: 'De API-sleutel is niet geaccepteerd. Controleer hem in de instellingen.',
     kiAusgelastet: 'De AI is op dit moment druk. Probeer het zo meteen opnieuw.',
     kiAbgelehnt: 'Het verzoek is geweigerd.',
-    kiZuLang: 'Het antwoord was te lang. Probeer het met minder tekst.'
+    kiZuLang: 'Het antwoord was te lang. Probeer het met minder tekst.',
+    keinZugriff: 'Geen toegang tot de spreadsheet van dit boek – die is waarschijnlijk van iemand anders. Vraag of de map ‘{ordner}’ in Google Drive met je gedeeld wordt (Bewerker) en laad daarna opnieuw.'
   }
 };
 

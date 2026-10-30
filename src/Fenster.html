@@ -82,7 +82,7 @@ var BWFenster = (function () {
   }
 
   function fehlertext(err) {
-    return ((err && err.message) || String(err)).replace(/^(Exception|Error):\s*/, '');
+    return ((err && err.message) || String(err)).replace(/^(Exception|Error):\s*/, '').replace('[BW-ZUGRIFF] ', '🔒 ');
   }
 
   var toastTimer = null;

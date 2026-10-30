@@ -375,6 +375,19 @@ function einstellungenRoh_() {
 var bwCacheDb_ = null;
 
 /** Öffnet die Tabelle zum Dokument – oder legt sie im Buch-Ordner an. */
+/** Steht vor der Fehlermeldung, damit die Seitenleiste passende Knöpfe zeigen kann. */
+var BW_KEIN_ZUGRIFF = '[BW-ZUGRIFF] ';
+
+/**
+ * Für den Notfall: Die Tabelle des Buchs ist endgültig weg oder nicht mehr
+ * freizugeben. Dann (nach Rückfrage in der Seitenleiste) neu anfangen.
+ */
+function bwTabelleNeuAnlegen() {
+  PropertiesService.getDocumentProperties().deleteProperty(BW_PROP_DB);
+  bwCacheDb_ = null;
+  return datenbank_().getUrl();
+}
+
 function datenbank_() {
   if (bwCacheDb_) return bwCacheDb_;
   var props = PropertiesService.getDocumentProperties();
@@ -382,11 +395,17 @@ function datenbank_() {
   var ss = null;
   if (id) {
     // Nur eine Tabelle im Papierkorb gilt als weg. Ist sie über Drive nicht
-    // erreichbar (z. B. von einer älteren Version angelegt), wird sie trotzdem
-    // geöffnet – sonst würde eine neue, leere Tabelle die Daten „verstecken“.
+    // erreichbar (z. B. von einer älteren Version angelegt oder von jemand
+    // anderem, der das Buch angelegt hat), wird sie trotzdem geöffnet.
     var info = dateiInfo_(id);
     if (!info || !info.trashed) {
-      try { ss = SpreadsheetApp.openById(id); } catch (err) { ss = null; }
+      try {
+        ss = SpreadsheetApp.openById(id);
+      } catch (err) {
+        // Kein Zugriff: Auf keinen Fall still eine neue, leere Tabelle anlegen –
+        // sonst teilt sich das Buch unbemerkt in zwei Datenbestände.
+        throw new Error(BW_KEIN_ZUGRIFF + tx_('keinZugriff', { ordner: DocumentApp.getActiveDocument().getName() + ' – Buchwerkstatt' }));
+      }
     }
   }
   if (!ss) {
