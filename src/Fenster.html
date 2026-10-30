@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <?!= include('Styles'); ?>
+  <style>
+    body.fenster { background: var(--grund); overflow: hidden; }
+    #fenster { height: 100vh; }
+    body.fenster .toast { left: auto; right: 18px; bottom: 18px; max-width: 420px; }
+  </style>
+</head>
+<body class="fenster">
+  <div id="fenster"><div class="laden"><div class="kreisel"></div></div></div>
+  <div id="toast" class="toast" hidden></div>
+  <script>var BW_FENSTER_START = <?!= start ?>;</script>
+  <?!= include('I18n'); ?>
+  <?!= include('I18n_fr'); ?>
+  <?!= include('I18n_es'); ?>
+  <?!= include('I18n_it'); ?>
+  <?!= include('I18n_pt'); ?>
+  <?!= include('I18n_nl'); ?>
+  <?!= include('Core'); ?>
+<script>
+/**
+ * Rahmen für das große Fenster (neben der Seitenleiste).
+ *
+ * Der Rahmen lädt die Daten, stellt die Sprache ein und bietet Speichern,
+ * Statusanzeige und Hinweise. Was im Fenster zu sehen ist, liefert eine
+ * Ansicht (Fenster_*.html), die sich mit BWFenster.registriere anmeldet:
+ *
+ *   BWFenster.registriere('steckbrief', {
+ *     start: function (F, param) { … F.el.innerHTML = …; },
+ *     vorSchliessen: function () { return Promise; }   // optional: offene Änderungen senden
+ *   });
+ *
+ * Geöffnet wird eine Ansicht von der Seitenleiste mit bwFensterOeffnen(name, param, titel).
+ * Was das Fenster speichert, meldet der Server der Seitenleiste (fensterMelden_).
+ */
+var BWFenster = (function () {
+  var C = BWCore, I = BWI18n;
+  var ANSICHTEN = {};
+  var laufend = 0, gespeichert = false, ansicht = null;
+
+  var F = {
+    C: C, I: I, t: I.t, h: C.escapeHtml,
+    th: function (k, w) { return C.escapeHtml(I.t(k, w)); },
+    el: null, daten: null, artVon: {}, eintragVon: {}, index: null, graph: null,
+    rufe: rufe, sichere: sichere, toast: toast, schliessen: schliessen, berechne: berechne,
+    istKarte: function (e) { return !!(e && F.artVon[e.art] && F.artVon[e.art].karte); },
+    kiSichtbar: function () { return F.daten.ki.aktiv && F.daten.einstellungen.kiAnzeigen !== false; },
+    zeigeStatus: zeigeStatus
+  };
+
+  function rufe(fn) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    return new Promise(function (ok, fehler) {
+      var r = google.script.run.withSuccessHandler(ok).withFailureHandler(fehler);
+      r[fn].apply(r, args);
+    });
+  }
+
+  function sichere(fn) {
+    laufend++;
+    zeigeStatus();
+    return rufe.apply(null, arguments).then(function (x) {
+      laufend--;
+      gespeichert = true;
+      zeigeStatus();
+      return x;
+    }, function (err) {
+      laufend--;
+      zeigeStatus();
+      toast(fehlertext(err), { fehler: true });
+      throw err;
+    });
+  }
+
+  function zeigeStatus() {
+    var el = document.getElementById('fenster-status');
+    if (el) el.textContent = laufend > 0 ? F.t('status.speichert') : gespeichert ? '✓ ' + F.t('gespeichert') : '';
+  }
+
+  function fehlertext(err) {
+    return ((err && err.message) || String(err)).replace(/^(Exception|Error):\s*/, '');
+  }
+
+  var toastTimer = null;
+  function toast(text, opt) {
+    opt = opt || {};
+    var el = document.getElementById('toast');
+    clearTimeout(toastTimer);
+    el.className = 'toast' + (opt.fehler ? ' fehler' : '');
+    el.innerHTML = '<span>' + F.h(text) + '</span><button title="' + F.th('schliessen') + '">✕</button>';
+    el.hidden = false;
+    el.onclick = function () { el.hidden = true; };
+    toastTimer = setTimeout(function () { el.hidden = true; }, opt.fehler ? 7000 : 4000);
+  }
+
+  function berechne() {
+    var d = F.daten;
+    F.artVon = C.artenMap(d.einstellungen);
+    F.eintragVon = {};
+    d.eintraege.forEach(function (e) { F.eintragVon[e.id] = e; });
+    F.index = C.baueIndex(d.eintraege, C.alleArten(d.einstellungen));
+    F.graph = C.verbindungen(d.eintraege, F.index, d.beziehungen);
+  }
+
+  /** Erst offene Änderungen senden, dann schließen. */
+  function schliessen() {
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    var vorher = ansicht && ansicht.vorSchliessen ? ansicht.vorSchliessen() : Promise.resolve();
+    vorher.then(warte, warte);
+    function warte() {
+      if (laufend > 0) { setTimeout(warte, 150); return; }
+      google.script.host.close();
+    }
+  }
+
+  function registriere(name, modul) { ANSICHTEN[name] = modul; }
+
+  function start() {
+    var s = BW_FENSTER_START;
+    F.el = document.getElementById('fenster');
+    rufe('bwLaden').then(function (d) {
+      F.daten = d;
+      var sprache = d.einstellungen.sprache;
+      I.setze(sprache && sprache !== 'auto' ? sprache : I.automatisch(d.kontoSprache));
+      document.documentElement.lang = I.sprache();
+      berechne();
+      ansicht = ANSICHTEN[s.ansicht];
+      ansicht.start(F, s.start || {});
+      window.addEventListener('beforeunload', function () { if (ansicht.vorSchliessen) ansicht.vorSchliessen(); });
+    }, function (err) {
+      F.el.innerHTML = '<div class="leer"><div class="gross">😕</div>' + F.th('laden.fehler') + '<br><small>' + F.h(fehlertext(err)) + '</small></div>';
+    });
+  }
+
+  return { registriere: registriere, start: start };
+})();
+</script>
+  <?!= include('Fenster_Steckbrief'); ?>
+  <script>BWFenster.start();</script>
+</body>
+</html>

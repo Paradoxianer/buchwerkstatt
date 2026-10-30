@@ -1,0 +1,257 @@
+<style>
+  .sb { display: flex; flex-direction: column; height: 100vh; }
+  .sb-kopf { display: flex; align-items: center; gap: 12px; padding: 12px 18px; background: var(--flaeche); border-bottom: 1px solid var(--linie); }
+  .sb-kopf .avatar { width: 44px; height: 44px; font-size: 18px; }
+  .sb-titel { min-width: 0; }
+  .sb-titel h1 { margin: 0; font-size: 20px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sb-fortschritt { margin-left: auto; width: 210px; font-size: 11.5px; color: var(--text-2); }
+  .sb-fortschritt small { display: block; margin-top: 4px; }
+  .balken { height: 6px; background: var(--linie); border-radius: 3px; overflow: hidden; }
+  .balken i { display: block; height: 100%; background: var(--c); border-radius: 3px; transition: width .3s ease; }
+  .sb-kopf .kopf-status { min-width: 90px; text-align: right; }
+
+  .sb-koerper { flex: 1; display: grid; grid-template-columns: 230px 1fr; min-height: 0; }
+  .sb-tabs { overflow-y: auto; padding: 12px 8px; background: var(--flaeche); border-right: 1px solid var(--linie); }
+  .sb-tab { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 2px 8px; width: 100%; text-align: left; border: 0; background: none; padding: 8px 10px; border-radius: 8px; margin-bottom: 2px; }
+  .sb-tab:hover { background: var(--grund); }
+  .sb-tab.aktiv { background: var(--hell); font-weight: 600; }
+  .sb-tab small { color: var(--text-3); font-size: 11.5px; font-weight: 400; }
+  .sb-tab.voll small { color: var(--c); font-weight: 600; }
+  .sb-tab .balken { grid-column: 1 / -1; height: 3px; }
+
+  .sb-inhalt { overflow-y: auto; padding: 18px 28px 28px; }
+  .sb-innen { max-width: 700px; }
+  .sb-bereich-kopf { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .sb-bereich-kopf h2 { margin: 0; font-size: 17px; font-weight: 600; flex: 1; }
+  .sb-feld { background: var(--flaeche); border-radius: var(--radius); box-shadow: var(--schatten); padding: 10px 12px 12px; margin-bottom: 10px; }
+  .sb-feld label { display: block; font-weight: 600; }
+  .sb-feld.voll label::after { content: ' ✓'; color: var(--c); }
+  .sb-frage { color: var(--text-2); font-size: 12.5px; margin: 2px 0 6px; }
+  .sb-feld textarea { display: block; width: 100%; margin-top: 4px; border: 1px solid var(--linie); border-radius: 6px; padding: 6px 8px; resize: none; min-height: 44px; outline: 0; overflow: hidden; font-size: 14px; line-height: 1.5; background: var(--flaeche); }
+  .sb-feld textarea:focus { border-color: var(--akzent); box-shadow: 0 0 0 3px var(--akzent-hell); }
+  .sb-vorschlag { display: flex; gap: 8px; align-items: flex-start; margin-top: 6px; padding: 6px 8px; border: 1px solid #d7c7f5; background: #faf6ff; border-radius: 6px; }
+  .sb-vorschlag span { flex: 1; white-space: pre-wrap; }
+  .sb-fuss { display: flex; justify-content: space-between; gap: 10px; margin-top: 16px; }
+
+  @media (max-width: 640px) {
+    .sb-koerper { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+    .sb-tabs { display: flex; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--linie); padding: 6px; }
+    .sb-tab { width: auto; white-space: nowrap; }
+    .sb-fortschritt { display: none; }
+    .sb-inhalt { padding: 14px 16px 20px; }
+  }
+</style>
+<script>
+/**
+ * Ansicht „steckbrief“ im großen Fenster: der Steckbrief einer Karte,
+ * links die Bereiche (Tabs) mit Fortschritt, rechts die Fragen eines Bereichs.
+ *
+ * Gespeichert wird beim Tippen (kurz verzögert) und nur das geänderte Feld
+ * (bwFelderSetzen) – so überschreibt das Fenster nichts, was gleichzeitig in
+ * der Seitenleiste geändert wird.
+ */
+BWFenster.registriere('steckbrief', (function () {
+  var F, t, h, th;
+  var e, a, gruppen = [], aktiv = 0;
+  var offen = {}, timer = null;
+  var vorschlag = null, kiLaeuft = false;
+
+  function start(f, param) {
+    F = f; t = F.t; h = F.h; th = F.th;
+    e = F.eintragVon[param.id];
+    if (!e) { F.el.innerHTML = '<div class="leer"><div class="gross">🗂️</div>' + th('fenster.fehlt') + '</div>'; return; }
+    a = F.artVon[e.art];
+    e.felder = e.felder || {};
+    gruppen = F.C.steckbrief(a.felder, e.felder, t('karte.weitere'));
+    gruppen.forEach(function (g) { if (!g.titel) g.titel = t('karte.steckbrief'); });
+    // Beim ersten Bereich anfangen, der noch nicht fertig ist.
+    aktiv = Math.max(0, gruppen.findIndex(function (g) { return F.C.ausgefuellt(g, e.felder) < g.felder.length; }));
+    render();
+    fokusAufErstesLeeres();
+    F.el.addEventListener('input', eingabe);
+    F.el.addEventListener('change', function (ev) { if (ev.target.dataset.f != null) senden(); });
+    F.el.addEventListener('click', klick);
+  }
+
+  function initialen(name) {
+    var teile = String(name || '?').trim().split(/\s+/);
+    return h((teile[0][0] || '?') + (teile.length > 1 ? teile[teile.length - 1][0] : '')).toUpperCase();
+  }
+
+  function prozent(n, gesamt) { return gesamt ? Math.round(100 * n / gesamt) : 0; }
+
+  function render() {
+    var html = '<div class="sb" style="--c:' + a.farbe + ';--hell:' + a.hell + '">' +
+      '<header class="sb-kopf"><span class="avatar">' + initialen(e.name) + '</span>' +
+      '<div class="sb-titel"><div class="karte-art">' + a.icon + ' ' + h(a.name) + '</div><h1>' + h(e.name) + '</h1></div>' +
+      '<div class="sb-fortschritt" id="sb-gesamt"></div>' +
+      '<span class="kopf-status" id="fenster-status"></span>' +
+      '<button class="knopf primaer" data-aktion="fertig">' + th('fertig') + '</button></header>';
+    if (!gruppen.length) {
+      F.el.innerHTML = html + '<div class="leer">' + th('fenster.leer') + '</div></div>';
+      return;
+    }
+    html += '<div class="sb-koerper"><nav class="sb-tabs">' + gruppen.map(function (g, i) {
+      return '<button class="sb-tab' + (i === aktiv ? ' aktiv' : '') + '" data-aktion="tab" data-i="' + i + '"><span>' + h(g.titel) + '</span><small></small><span class="balken"><i></i></span></button>';
+    }).join('') + '</nav><main class="sb-inhalt" id="sb-inhalt"><div class="sb-innen">' + bereich(gruppen[aktiv]) + '</div></main></div></div>';
+    F.el.innerHTML = html;
+    Array.prototype.forEach.call(F.el.querySelectorAll('textarea[data-f]'), autoHoehe);
+    zaehler();
+    F.zeigeStatus();
+  }
+
+  function bereich(g) {
+    var v = vorschlag && vorschlag.gruppe === aktiv ? vorschlag.felder : null;
+    var html = '<div class="sb-bereich-kopf"><h2>' + h(g.titel) + '</h2>' +
+      (F.kiSichtbar() ? '<button class="knopf ki klein" data-aktion="ki" title="' + th('fenster.ki.titel') + '"' + (kiLaeuft ? ' disabled' : '') + '>' +
+        (kiLaeuft ? th('ki.liest', { name: e.name }) : th('fenster.ki')) + '</button>' : '') + '</div>';
+    if (v && Object.keys(v).length) {
+      html += '<div class="vorschlag-box"><h4>' + th('ki.vorschlag') + '</h4><div class="ki-leiste">' +
+        '<button class="knopf primaer klein" data-aktion="alle">' + th('fenster.alleUebernehmen') + '</button>' +
+        '<button class="knopf klein" data-aktion="verwerfen">' + th('ki.verwerfen') + '</button></div></div>';
+    }
+    html += g.felder.map(function (f, i) {
+      var wert = e.felder[f.name] || '';
+      return '<div class="sb-feld' + (wert.trim() ? ' voll' : '') + '"><label for="sb-f' + i + '">' + h(f.name) + '</label>' +
+        (f.frage ? '<div class="sb-frage">' + h(f.frage) + '</div>' : '') +
+        '<textarea id="sb-f' + i + '" data-f="' + i + '" rows="2">' + h(wert) + '</textarea>' +
+        (v && v[f.name] ? '<div class="sb-vorschlag"><span>✨ ' + h(v[f.name]) + '</span>' +
+          '<button class="knopf primaer klein" data-aktion="ja" data-f="' + i + '">' + th('ki.uebernehmen') + '</button>' +
+          '<button class="knopf klein" data-aktion="nein" data-f="' + i + '">✕</button></div>' : '') +
+        '</div>';
+    }).join('');
+    var zurueck = gruppen[aktiv - 1], weiter = gruppen[aktiv + 1];
+    html += '<div class="sb-fuss">' +
+      (zurueck ? '<button class="knopf" data-aktion="tab" data-i="' + (aktiv - 1) + '">' + th('fenster.zurueck', { titel: zurueck.titel }) + '</button>' : '<span></span>') +
+      (weiter ? '<button class="knopf primaer" data-aktion="tab" data-i="' + (aktiv + 1) + '">' + th('fenster.weiter', { titel: weiter.titel }) + '</button>'
+        : '<button class="knopf primaer" data-aktion="fertig">' + th('fertig') + '</button>') + '</div>';
+    return html;
+  }
+
+  /** Fortschritt in den Tabs und oben – ohne neu zu zeichnen, damit der Cursor bleibt. */
+  function zaehler() {
+    var voll = 0, gesamt = 0;
+    var tabs = F.el.querySelectorAll('.sb-tab');
+    gruppen.forEach(function (g, i) {
+      var n = F.C.ausgefuellt(g, e.felder);
+      voll += n;
+      gesamt += g.felder.length;
+      if (!tabs[i]) return;
+      tabs[i].classList.toggle('voll', n === g.felder.length);
+      tabs[i].querySelector('small').textContent = n + '/' + g.felder.length;
+      tabs[i].querySelector('i').style.width = prozent(n, g.felder.length) + '%';
+    });
+    var el = document.getElementById('sb-gesamt');
+    if (el) el.innerHTML = '<div class="balken"><i style="width:' + prozent(voll, gesamt) + '%"></i></div><small>' + th('fenster.ausgefuellt', { n: voll, gesamt: gesamt }) + '</small>';
+  }
+
+  function autoHoehe(ta) {
+    ta.style.height = 'auto';
+    ta.style.height = ta.scrollHeight + 2 + 'px';
+  }
+
+  function feld(i) { return gruppen[aktiv].felder[Number(i)]; }
+
+  function setze(name, wert) {
+    e.felder[name] = wert;
+    offen[name] = wert;
+    clearTimeout(timer);
+    timer = setTimeout(senden, 700);
+  }
+
+  function eingabe(ev) {
+    var ta = ev.target;
+    if (ta.dataset.f == null || ta.tagName !== 'TEXTAREA') return;
+    autoHoehe(ta);
+    setze(feld(ta.dataset.f).name, ta.value);
+    ta.closest('.sb-feld').classList.toggle('voll', !!ta.value.trim());
+    zaehler();
+  }
+
+  function senden() {
+    clearTimeout(timer);
+    var aenderungen = offen;
+    offen = {};
+    if (!Object.keys(aenderungen).length) return Promise.resolve();
+    return F.sichere('bwFelderSetzen', e.id, aenderungen).catch(function () {
+      // Nicht gespeichert: beim nächsten Mal erneut versuchen.
+      Object.keys(aenderungen).forEach(function (k) { if (!(k in offen)) offen[k] = aenderungen[k]; });
+    });
+  }
+
+  function zeigeBereich(i) {
+    senden();
+    aktiv = i;
+    render();
+    var inhalt = document.getElementById('sb-inhalt');
+    if (inhalt) inhalt.scrollTop = 0;
+    fokusAufErstesLeeres();
+  }
+
+  /** Gleich losschreiben können: Cursor ins erste leere Feld des Bereichs. */
+  function fokusAufErstesLeeres() {
+    var leer = Array.prototype.filter.call(F.el.querySelectorAll('textarea[data-f]'), function (x) { return !x.value.trim(); })[0];
+    if (leer) leer.focus({ preventScroll: true });
+  }
+
+  function kiVorschlagen() {
+    var g = gruppen[aktiv], nr = aktiv;
+    var namen = g.felder.map(function (f) { return f.name; });
+    var fragen = {};
+    g.felder.forEach(function (f) { if (f.frage) fragen[f.name] = f.frage; });
+    var notizen = (F.graph.rein[e.id] || []).map(function (id) { return F.eintragVon[id]; })
+      .filter(function (x) { return x && !F.istKarte(x); })
+      .sort(function (x, y) { return String(x.erstellt).localeCompare(String(y.erstellt)); })
+      .map(function (x) { return (x.name ? x.name + ': ' : '') + x.text; });
+    kiLaeuft = true;
+    render();
+    F.rufe('bwKiFelder', {
+      art: a.name, name: e.name, felder: namen, fragen: fragen, vorhanden: e.felder, text: e.text, notizen: notizen,
+      namen: F.daten.eintraege.filter(function (k) { return F.istKarte(k) && k.name && k.id !== e.id; }).map(function (k) { return k.name; })
+    }).then(function (v) {
+      kiLaeuft = false;
+      var neu = {};
+      Object.keys(v.felder || {}).filter(function (k) { return namen.indexOf(k) >= 0; }).forEach(function (k) {
+        var wert = String(v.felder[k] || '').trim();
+        if (wert && wert !== String(e.felder[k] || '').trim()) neu[k] = wert;
+      });
+      vorschlag = Object.keys(neu).length ? { gruppe: nr, felder: neu } : null;
+      if (!vorschlag) F.toast(t('ki.nichtsNeu'));
+      render();
+    }, function (err) {
+      kiLaeuft = false;
+      render();
+      F.toast((err && err.message) || String(err), { fehler: true });
+    });
+  }
+
+  function uebernehmen(namen) {
+    namen.forEach(function (n) {
+      setze(n, vorschlag.felder[n]);
+      delete vorschlag.felder[n];
+    });
+    if (!Object.keys(vorschlag.felder).length) vorschlag = null;
+    senden();
+    render();
+  }
+
+  function klick(ev) {
+    var b = ev.target.closest('[data-aktion]');
+    if (!b) return;
+    var was = b.dataset.aktion;
+    if (was === 'tab') zeigeBereich(Number(b.dataset.i));
+    else if (was === 'fertig') F.schliessen();
+    else if (was === 'ki') kiVorschlagen();
+    else if (was === 'alle') uebernehmen(Object.keys(vorschlag.felder));
+    else if (was === 'verwerfen') { vorschlag = null; render(); }
+    else if (was === 'ja') uebernehmen([feld(b.dataset.f).name]);
+    else if (was === 'nein') {
+      delete vorschlag.felder[feld(b.dataset.f).name];
+      if (!Object.keys(vorschlag.felder).length) vorschlag = null;
+      render();
+    }
+  }
+
+  return { start: start, vorSchliessen: senden };
+})());
+</script>

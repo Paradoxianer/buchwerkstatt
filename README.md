@@ -35,6 +35,11 @@ Die Grundidee: **Es gibt nur einen Notizblock.** Das erste Wort einer Notiz ents
   - Neue Notizen werden auf Wunsch automatisch angeheftet. „📍 Hier“ zeigt die Notizen zum aktuellen Kapitel in der Reihenfolge des Textes.
 - **👤 Karte unter dem Cursor:** Steht der Cursor auf einem Namen, erscheint oben die Kurzinfo zur Figur. Sonst zeigt die Leiste, wer im aktuellen Absatz vorkommt.
 - **👥 Welt:** Alle Figuren, Orte und Gegenstände mit Steckbrief, Beschreibung, Beziehungen („Tochter von“) und automatischen Verbindungen. Eigene Arten (z. B. „Organisation“) lassen sich mit eigenen Feldern anlegen.
+- **🗂️ Ausführlicher Steckbrief:** Personen haben einen Fragebogen mit acht Bereichen (Grunddaten, Aussehen, Familie, Beziehungen, Arbeit & Alltag, Innenleben, Auftreten, In der Geschichte). Jedes Feld hat eine Leitfrage, damit man jeden Bereich wirklich durchdenkt. Orte und Gegenstände haben kleinere Fragebögen.
+  - In der Seitenleiste lassen sich die Bereiche aufklappen; daneben steht, wie viel schon ausgefüllt ist.
+  - **✎ Ausführlich** öffnet ein großes Fenster: links die Bereiche mit Fortschritt, rechts die Fragen mit viel Platz. Das Manuskript bleibt dabei bedienbar.
+  - Mit KI schlägt **✨ Aus den Notizen vorschlagen** Antworten für den gerade offenen Bereich vor.
+  - Unter **⚙️ Mehr → Schlüsselwörter & Felder** lässt sich zwischen ausführlichem Fragebogen und kurzer Liste wechseln oder alles selbst schreiben: `# Familie` beginnt einen Bereich, `Eltern | Wer sind die Eltern?` gibt dem Feld eine Leitfrage.
 - **📅 Zeitstrahl:** Ereignisse nach Datum im Buch sortiert, filterbar nach Figur. Erkannt werden z. B. „12. März“, „3.4.1987“ und „Tag 5“.
 - **💡 Pinnwand:** Ideen nach offen, verwendet und verworfen sortiert.
 - **🎯 Ziel:** Wörter heute, Tagesziel, Verlauf der letzten 14 Tage, Serie und Fortschritt fürs ganze Buch.
@@ -88,7 +93,7 @@ Für den eigenen Gebrauch reicht es, die Erweiterung als Apps-Script-Projekt an 
 
 1. Manuskript öffnen → **Erweiterungen → Apps Script**.
 2. Für jede Datei aus dem Ordner [`src/`](src) im Editor über **＋ → Skript** (für `.gs`) bzw. **＋ → HTML** (für `.html`) eine Datei **mit gleichem Namen** anlegen und den Inhalt hineinkopieren:
-   `Main`, `Store`, `Ablage`, `Sprachen`, `Dokument`, `Blaetter`, `Ki`, `Statistik` (Skript) sowie `Sidebar`, `Styles`, `I18n`, `I18n_fr`, `I18n_es`, `I18n_it`, `I18n_pt`, `I18n_nl`, `Core`, `App` (HTML). Die vorhandene `Code.gs` kann gelöscht werden.
+   `Main`, `Store`, `Ablage`, `Sprachen`, `Fragebogen`, `Dokument`, `Blaetter`, `Ki`, `Statistik` (Skript) sowie `Sidebar`, `Styles`, `I18n`, `I18n_fr`, `I18n_es`, `I18n_it`, `I18n_pt`, `I18n_nl`, `Core`, `App`, `Fenster`, `Fenster_Steckbrief` (HTML). Die vorhandene `Code.gs` kann gelöscht werden.
 3. **⚙️ Projekteinstellungen → „Manifestdatei appsscript.json im Editor anzeigen“** aktivieren und den Inhalt von [`src/appsscript.json`](src/appsscript.json) übernehmen.
 4. Speichern, das Manuskript neu laden → **Erweiterungen → Buchwerkstatt → Buchwerkstatt öffnen**.
 
@@ -123,6 +128,7 @@ src/            Apps-Script-Projekt (wird mit clasp hochgeladen)
   Store.gs        Tabelle als Datenablage, Einstellungen
   Ablage.gs       Drive-Zugriff (nur eigene Dateien, drive.file) über die Drive-API
   Sprachen.gs     Server-Texte und Standard-Schlüsselwörter/Felder je Sprache
+  Fragebogen.gs   Ausführliche Steckbriefe (Bereiche mit Leitfragen) je Sprache
   Dokument.gs     Cursor, Textstellen (Named Ranges), Kapitel, Markieren, Vorkommen
   Blaetter.gs     Personenblätter als Google Docs
   Ki.gs           Claude-API (Felder füllen, Widersprüche prüfen)
@@ -133,6 +139,8 @@ src/            Apps-Script-Projekt (wird mit clasp hochgeladen)
   I18n_xx.html    weitere Sprachen (fr, es, it, pt, nl) – je ein Wörterbuch
   Core.html       Logik ohne Oberfläche: Notiz zerlegen, Namen finden, Datum sortieren
   App.html        Oberfläche
+  Fenster.html    Großes Fenster: Rahmen (Laden, Sprache, Speichern) für austauschbare Ansichten
+  Fenster_Steckbrief.html  Ansicht „Steckbrief“ im großen Fenster
 dev/            Vorschau ohne Google (mock.js ersetzt google.script.run)
 tests/          Tests (Kernlogik, Vollständigkeit der Sprachen, Marketplace-Voraussetzungen)
 docs/           Startseite, Datenschutz, Nutzungsbedingungen (GitHub Pages), Store-Material, Veröffentlichungsanleitung
@@ -146,7 +154,7 @@ npm test
 npm run vorschau
 ```
 
-`npm run vorschau` baut `dist/vorschau.html` mit Beispieldaten. Die Datei lässt sich einfach im Browser öffnen. Am Ende der Adresse startet `#leer` mit einem leeren Buch, `#ki` mit eingerichteter KI, und ein Sprachkürzel (`#en`, `#fr`, `#es`, `#it`, `#pt`, `#nl`) wählt die Sprache. Die Zusätze lassen sich kombinieren, z. B. `#leer-fr-ki`.
+`npm run vorschau` baut `dist/vorschau.html` mit Beispieldaten. Die Datei lässt sich einfach im Browser öffnen. Am Ende der Adresse startet `#leer` mit einem leeren Buch, `#ki` mit eingerichteter KI, und ein Sprachkürzel (`#en`, `#fr`, `#es`, `#it`, `#pt`, `#nl`) wählt die Sprache. Die Zusätze lassen sich kombinieren, z. B. `#leer-fr-ki`. Daneben entsteht `dist/fenster.html` mit dem großen Steckbrief-Fenster (`#id=p1` wählt die Karte).
 
 `npm test` prüft auch, dass jede Sprache alle Texte mit denselben Platzhaltern hat.
 

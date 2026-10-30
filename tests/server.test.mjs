@@ -19,6 +19,8 @@ function welt() {
     return { getProperty: (k) => (k in p ? p[k] : null), setProperty: (k, v) => { p[k] = String(v); }, deleteProperty: (k) => { delete p[k]; } };
   }
   const dokProps = props(), nutzerProps = props();
+  const cacheDaten = {};
+  const cache = { get: (k) => (k in cacheDaten ? cacheDaten[k] : null), put: (k, v) => { cacheDaten[k] = v; } };
 
   function datei(name, mimeType, parents) {
     const id = neueId('f');
@@ -135,10 +137,11 @@ function welt() {
     Session: { getActiveUserLocale: () => 'de', getScriptTimeZone: () => 'Europe/Berlin' },
     Utilities: { formatDate: (d) => d.toISOString().slice(0, 16).replace('T', ' '), getUuid: () => 'uuid-' + (++zaehler) + '-xxxxxxxx' },
     LockService: { getDocumentLock: () => ({ waitLock() {}, releaseLock() {} }) },
-    UrlFetchApp: {}, HtmlService: {}
+    UrlFetchApp: {}, HtmlService: {},
+    CacheService: { getDocumentCache: () => cache }
   };
   const namen = Object.keys(globals);
-  const fns = new Function(...namen, code + '; return { bwSpeichern, bwBlaetterSync, bwLoeschen, bwLaden, datenbank_, neueAusfuehrung: function () { bwCacheDb_ = null; bwCacheSprache_ = null; } };')(...namen.map((n) => globals[n]));
+  const fns = new Function(...namen, code + '; return { bwSpeichern, bwBlaetterSync, bwLoeschen, bwLaden, datenbank_, bwFelderSetzen, bwEintraegeLesen, bwEinstellungenSpeichern, einstellungen_, fragebogen_, kurzeFelder_, neueAusfuehrung: function () { bwCacheDb_ = null; bwCacheSprache_ = null; } };')(...namen.map((n) => globals[n]));
   return { fns, dateien, docs, dokProps, zugriff };
 }
 
@@ -198,4 +201,46 @@ test('Tabelle im Papierkorb → neue Tabelle', () => {
   dateien[alt].trashed = true;
   fns.neueAusfuehrung();
   assert.notEqual(fns.datenbank_().getId(), alt);
+});
+
+test('Großes Fenster: einzelne Felder setzen, ohne den Rest zu überschreiben, und der Seitenleiste melden', () => {
+  const { fns } = welt();
+  const lena = fns.bwSpeichern({ art: 'person', name: 'Lena', text: 'Hebamme', felder: { Alter: '34', Beruf: 'Hebamme' } }, {});
+  const vorher = fns.bwLaden().fensterStand;
+  const neu = fns.bwFelderSetzen(lena.id, { Eltern: 'Vater verschwunden', Alter: '35' });
+  assert.deepEqual(neu.felder, { Alter: '35', Beruf: 'Hebamme', Eltern: 'Vater verschwunden' });
+  assert.equal(neu.text, 'Hebamme', 'Rest der Karte bleibt');
+  const stand = fns.bwLaden().fensterStand;
+  assert.ok(stand && stand !== vorher && stand.ids[0] === lena.id, 'Änderung gemeldet');
+  assert.deepEqual(fns.bwEintraegeLesen([lena.id])[0].felder, neu.felder);
+  fns.bwFelderSetzen(lena.id, { Kindheit: 'Wuchs am Hafen auf.\n\nDer Vater verschwand: 1987.' });
+  assert.equal(fns.bwEintraegeLesen([lena.id])[0].felder.Kindheit, 'Wuchs am Hafen auf.\n\nDer Vater verschwand: 1987.', 'Zeilenumbrüche bleiben erhalten');
+  fns.bwFelderSetzen(lena.id, { Eltern: '', Kindheit: '' });
+  assert.deepEqual(fns.bwEintraegeLesen([lena.id])[0].felder, { Alter: '35', Beruf: 'Hebamme' }, 'leeres Feld verschwindet');
+});
+
+test('Steckbrief-Vorlagen: neu ausführlich, Auswahl bleibt, Speicher klein', () => {
+  const { fns, dokProps } = welt();
+  const person = () => fns.einstellungen_().arten.find((a) => a.id === 'person');
+  assert.deepEqual(person().felder, fns.fragebogen_('de', 'person'), 'neues Buch: ausführlich');
+
+  // Bewusst die kurze Liste gewählt → bleibt kurz
+  const e = fns.einstellungen_();
+  e.arten.find((a) => a.id === 'person').felder = fns.kurzeFelder_('de', 'person');
+  fns.bwEinstellungenSpeichern(e);
+  fns.neueAusfuehrung();
+  assert.deepEqual(person().felder, fns.kurzeFelder_('de', 'person'));
+
+  // Eigene Liste bleibt, wie sie ist
+  e.arten.find((a) => a.id === 'person').felder = ['# Eigenes', 'Lieblingsessen | Was isst sie gern?'];
+  fns.bwEinstellungenSpeichern(e);
+  fns.neueAusfuehrung();
+  assert.deepEqual(person().felder, ['# Eigenes', 'Lieblingsessen | Was isst sie gern?']);
+
+  // Mit allen Fragebögen bleiben die Einstellungen weit unter 9 KB
+  e.arten.forEach((a) => { const f = fns.fragebogen_('de', a.id); if (f && a.karte) a.felder = f; });
+  fns.bwEinstellungenSpeichern(e);
+  assert.ok(dokProps.getProperty('BW_EINSTELLUNGEN').length < 3000, 'Verweis statt Liste gespeichert');
+  fns.neueAusfuehrung();
+  assert.deepEqual(person().felder, fns.fragebogen_('de', 'person'));
 });

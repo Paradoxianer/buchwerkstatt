@@ -18,13 +18,14 @@
   function th(schluessel, werte) { return h(t(schluessel, werte)); }
 
   var S = {
-    buch: '', tabelleUrl: '', ordnerUrl: '', kontoSprache: '', standardArten: {},
+    buch: '', tabelleUrl: '', ordnerUrl: '', kontoSprache: '', standardArten: {}, kurzeArten: {},
     einst: null, eintraege: [], beziehungen: [], ki: { aktiv: false },
     cursor: null, textstellen: {}, stat: null,
     ansicht: 'notizen', karteId: null, verlauf: [],
     filter: merke('filter') || 'alle', suche: '', weltSuche: '', zeitMit: '',
     neuIn: null, bearbeiten: null, kiVorschlag: null, kiBefunde: null, vorkommen: null,
-    blaetterOffen: {}
+    blaetterOffen: {},
+    gruppeAuf: merke('gruppen') || {}, fensterZeit: 0
   };
   var D = { index: null, artVon: {}, eintragVon: {}, graph: null, jahr: 0 };
   var tmpZaehler = 0;
@@ -378,6 +379,8 @@
       ['name', 'mehrzahl', 'woerter', 'felder'].forEach(function (f) {
         if (gleich(a[f], v[f])) a[f] = JSON.parse(JSON.stringify(n[f]));
       });
+      var kurzVorher = (S.kurzeArten[alt] || {})[a.id], kurzNachher = (S.kurzeArten[I.sprache()] || {})[a.id];
+      if (kurzVorher && kurzNachher && gleich(a.felder, kurzVorher)) a.felder = kurzNachher.slice();
     });
     speichereEinstellungen();
     zeigeStatus();
@@ -426,8 +429,15 @@
   function baueBlatt(e) {
     var a = art(e.art);
     var abschnitte = [];
-    var felder = Object.keys(e.felder || {}).filter(function (k) { return e.felder[k]; });
-    abschnitte.push({ titel: t('blatt.steckbrief'), zeilen: felder.map(function (k) { return [{ t: k + ': ', fett: true }].concat(stuecke(e.felder[k])); }) });
+    var werte = e.felder || {};
+    // Ein Abschnitt pro Bereich des Steckbriefs; leere Abschnitte lässt das Blatt weg.
+    C.steckbrief(a.felder, werte, t('karte.weitere')).forEach(function (g) {
+      abschnitte.push({
+        titel: g.titel || t('blatt.steckbrief'),
+        zeilen: g.felder.filter(function (f) { return String(werte[f.name] || '').trim(); })
+          .map(function (f) { return [{ t: f.name + ': ', fett: true }].concat(stuecke(werte[f.name])); })
+      });
+    });
     abschnitte.push({ titel: t('blatt.beschreibung'), zeilen: String(e.text || '').split('\n').filter(Boolean).map(stuecke) });
     abschnitte.push({
       titel: t('blatt.beziehungen'),
@@ -1055,14 +1065,12 @@
     if (S.kiVorschlag && S.kiVorschlag.id === e.id) html += kiVorschlagHtml(e);
     if (S.kiBefunde && S.kiBefunde.id === e.id) html += kiBefundeHtml();
 
-    // Steckbrief
-    var felder = (a.felder || []).slice();
-    Object.keys(e.felder || {}).forEach(function (k) { if (felder.indexOf(k) < 0) felder.push(k); });
-    if (felder.length) {
-      html += '<div class="block"><div class="block-titel">' + th('karte.steckbrief') + '</div><div class="felder">' +
-        felder.map(function (f) {
-          return '<label>' + h(f) + '</label><textarea data-auto rows="1" data-steckbrief="' + h(f) + '" placeholder="–">' + h((e.felder || {})[f] || '') + '</textarea>';
-        }).join('') + '</div></div>';
+    // Steckbrief – in Bereichen zum Aufklappen, wenn die Art welche hat
+    var gruppen = C.steckbrief(a.felder, e.felder, t('karte.weitere'));
+    if (gruppen.length) {
+      html += '<div class="block"><div class="block-titel">' + th('karte.steckbrief') + '</div>' +
+        gruppen.map(function (g) { return steckbriefGruppe(e, g); }).join('') +
+        '<div class="ki-leiste"><button class="knopf klein" data-aktion="steckbrief-fenster" title="' + th('karte.ausfuehrlich.titel') + '">' + th('karte.ausfuehrlich') + '</button></div></div>';
     }
 
     // Freitext (+ KI, falls eingeschaltet)
@@ -1120,6 +1128,66 @@
       html += '<div class="block"><div class="block-titel">' + th('karte.zeitstrahl') + '</div><div class="zeitstrahl">' + ereignisse.map(ereignisHtml).join('') + '</div></div>';
     }
     return html;
+  }
+
+  function steckbriefFelder(e, felder) {
+    return '<div class="felder">' + felder.map(function (f) {
+      return '<label title="' + h(f.frage) + '">' + h(f.name) + '</label><textarea data-auto rows="1" data-steckbrief="' + h(f.name) + '" placeholder="' + h(f.frage || '–') + '" title="' + h(f.frage) + '">' + h((e.felder || {})[f.name] || '') + '</textarea>';
+    }).join('') + '</div>';
+  }
+
+  function steckbriefGruppe(e, g) {
+    if (!g.titel) return steckbriefFelder(e, g.felder);
+    var n = C.ausgefuellt(g, e.felder), schluessel = e.art + '|' + g.titel;
+    return '<details class="sb-gruppe" data-gruppe="' + h(schluessel) + '"' + (S.gruppeAuf[schluessel] ? ' open' : '') + '>' +
+      '<summary>' + h(g.titel) + ' <span class="zahl' + (n === g.felder.length ? ' voll' : '') + '">' + n + '/' + g.felder.length + '</span></summary>' +
+      steckbriefFelder(e, g.felder) + '</details>';
+  }
+
+  /** Zähler „3/6“ eines Bereichs beim Tippen nachführen. */
+  function gruppeZaehlen(d) {
+    if (!d) return;
+    var felder = $$('textarea[data-steckbrief]', d);
+    var n = felder.filter(function (x) { return x.value.trim(); }).length;
+    var z = $('.zahl', d);
+    z.textContent = n + '/' + felder.length;
+    z.classList.toggle('voll', n === felder.length);
+  }
+
+  /** Öffnet den Steckbrief im großen Fenster – erst, wenn alles gespeichert ist. */
+  function steckbriefFenster() {
+    var e = eintrag(S.karteId);
+    if (!e || e.provisorisch) { toast(t('karte.nochNichtGespeichert')); return; }
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    // Das Fenster braucht einen Moment – solange den Knopf sperren, damit es nicht doppelt aufgeht.
+    var knopf = $('[data-aktion="steckbrief-fenster"]');
+    if (knopf) knopf.disabled = true;
+    var frei = function () { if (knopf) knopf.disabled = false; };
+    (function oeffne() {
+      if (laufend > 0) { setTimeout(oeffne, 150); return; }
+      rufe('bwFensterOeffnen', 'steckbrief', { id: e.id }, t('fenster.steckbrief.titel', { name: e.name }))
+        .then(frei, function (err) { frei(); toast(fehlertext(err), { fehler: true }); });
+    })();
+  }
+
+  /** Das große Fenster hat etwas gespeichert: die Steckbriefe dieser Einträge neu holen. */
+  function fensterAbgleich(stand) {
+    if (!stand || stand.zeit === S.fensterZeit) return;
+    S.fensterZeit = stand.zeit;
+    rufe('bwEintraegeLesen', stand.ids).then(function (liste) {
+      liste.forEach(function (neu) {
+        var e = eintrag(neu.id);
+        if (!e) return;
+        var vorher = verweiseVon(e);
+        e.felder = neu.felder;
+        e.geaendert = neu.geaendert;
+        berechne();
+        blaetterVormerken(vorher.concat(verweiseVon(e)));
+      });
+      var el = document.activeElement;
+      var tippt = el && el.matches && el.matches('#ansicht textarea, #ansicht input');
+      if (!tippt && (S.ansicht === 'karte' || S.ansicht === 'welt')) render();
+    }, function () {});
   }
 
   function renderKopfMenue() {
@@ -1237,13 +1305,18 @@
     var e = eintrag(S.karteId);
     if (!kiBereit()) return;
     var a = art(e.art);
-    var felder = (a.felder || []).slice();
-    Object.keys(e.felder || {}).forEach(function (k) { if (felder.indexOf(k) < 0) felder.push(k); });
+    var felder = [], fragen = {};
+    C.steckbrief(a.felder, e.felder).forEach(function (g) {
+      g.felder.forEach(function (f) {
+        felder.push(f.name);
+        if (f.frage) fragen[f.name] = f.frage;
+      });
+    });
     if (!felder.length) { toast(t('ki.keineFelder')); return; }
     S.kiVorschlag = { id: e.id, laedt: true };
     render();
     rufe('bwKiFelder', {
-      art: a.name, name: e.name, felder: felder, vorhanden: e.felder || {}, text: e.text,
+      art: a.name, name: e.name, felder: felder, fragen: fragen, vorhanden: e.felder || {}, text: e.text,
       notizen: notizenZu(e.id).concat(ereignisseZu(e.id)).map(function (n) { return (n.name ? n.name + ': ' : '') + n.text; }),
       namen: karten().filter(function (k) { return k.id !== e.id; }).map(function (k) { return k.name; })
     }).then(function (v) {
@@ -1477,7 +1550,7 @@
           '<div class="einst-zeile"><label>' + th('einst.art.name') + '</label><input data-art-i="' + i + '" data-art-feld="name" value="' + h(a.name) + '"></div>' +
           '<div class="einst-zeile"><label>' + th('einst.art.symbol') + '</label><input data-art-i="' + i + '" data-art-feld="icon" value="' + h(a.icon) + '" maxlength="4"></div>' +
           '<div class="einst-zeile"><label>' + th('einst.art.woerter') + '</label><input data-art-i="' + i + '" data-art-feld="woerter" value="' + h((a.woerter || []).join(', ')) + '"></div>' +
-          (a.karte ? '<div class="einst-zeile"><label>' + th('einst.art.felder') + '</label><textarea rows="5" data-art-i="' + i + '" data-art-feld="felder">' + h((a.felder || []).join('\n')) + '</textarea></div>' : '') +
+          (a.karte ? vorlagenWahl(a, i) + '<div class="einst-zeile"><label>' + th('einst.art.felder') + '</label><textarea rows="' + Math.min(16, Math.max(5, (a.felder || []).length)) + '" data-art-i="' + i + '" data-art-feld="felder">' + h((a.felder || []).join('\n')) + '</textarea></div>' : '') +
           (['person', 'ort', 'ding', 'zeit', 'idee'].indexOf(a.id) < 0 ? '<div class="ki-leiste"><button class="knopf klein gefahr" data-aktion="art-loeschen" data-i="' + i + '">' + th('einst.art.weg') + '</button></div>' : '') +
           '</details>';
       }).join('') +
@@ -1499,6 +1572,23 @@
 
     html += '<div class="block"><div class="block-titel">' + th('einst.hilfe') + '</div><button class="knopf klein" data-aktion="hilfe-an">' + th('einst.hilfeAn') + '</button></div>';
     return html;
+  }
+
+  function standardArt(id) {
+    return (S.standardArten[I.sprache()] || []).filter(function (x) { return x.id === id; })[0];
+  }
+
+  /** Für Personen, Orte und Gegenstände: zwischen ausführlichem Fragebogen und kurzer Liste wechseln. */
+  function vorlagenWahl(a, i) {
+    var lang = standardArt(a.id), kurz = (S.kurzeArten[I.sprache()] || {})[a.id];
+    if (!lang || !kurz || !kurz.length) return '';
+    var jetzt = JSON.stringify(a.felder || []);
+    var knopf = function (welche, liste, text) {
+      return '<button class="knopf klein' + (JSON.stringify(liste) === jetzt ? ' primaer' : '') + '" data-aktion="art-vorlage" data-i="' + i + '" data-vorlage="' + welche + '">' + th(text) + '</button>';
+    };
+    return '<div class="einst-zeile"><label>' + th('einst.art.vorlage') + '</label><div class="ki-leiste" style="margin-top:0">' +
+      knopf('lang', lang.felder, 'einst.art.lang') + knopf('kurz', kurz, 'einst.art.kurz') + '</div>' +
+      '<div class="unter">' + th('einst.art.vorlageInfo') + '</div></div>';
   }
 
   function schalter(feld, titel, text) {
@@ -1579,6 +1669,8 @@
     cursorLaeuft = true;
     rufe('bwCursor').then(function (c) {
       cursorLaeuft = false;
+      if (c && c.fenster) fensterAbgleich(c.fenster);
+      if (c && c.text == null) c = null;
       var alt = S.cursor;
       S.cursor = c || S.cursor;
       if (!c) return;
@@ -1672,6 +1764,16 @@
     'markieren': markieren,
     'markierung-weg': function () { sichere('bwHervorhebungEntfernen').then(function () { toast(t('einst.markEntfernt')); }); },
     'art-neu': neueArt,
+    'art-vorlage': function (b) {
+      var i = Number(b.dataset.i), a = S.einst.arten[i];
+      var liste = b.dataset.vorlage === 'kurz' ? (S.kurzeArten[I.sprache()] || {})[a.id] : standardArt(a.id).felder;
+      a.felder = liste.slice();
+      speichereEinstellungen().then(function () { toast(t('einst.art.vorlageGesetzt')); });
+      render();
+      var d = $$('.einst-art')[i];
+      if (d) d.open = true;
+    },
+    'steckbrief-fenster': steckbriefFenster,
     'art-loeschen': function (b) {
       var a = S.einst.arten[Number(b.dataset.i)];
       if (S.eintraege.some(function (e) { return e.art === a.id; })) { toast(t('einst.art.belegt')); return; }
@@ -1791,8 +1893,16 @@
     document.addEventListener('click', klick);
     document.addEventListener('change', aenderung);
     document.addEventListener('keydown', tasten);
+    // Auf- und zugeklappte Bereiche im Steckbrief merken (toggle steigt nicht auf, daher capture).
+    document.addEventListener('toggle', function (ev) {
+      var d = ev.target;
+      if (!d.dataset || !d.dataset.gruppe) return;
+      S.gruppeAuf[d.dataset.gruppe] = d.open;
+      merke('gruppen', S.gruppeAuf);
+    }, true);
     document.addEventListener('input', function (ev) {
       if (ev.target.matches('textarea[data-auto]')) autoHoehe(ev.target);
+      if (ev.target.dataset.steckbrief) gruppeZaehlen(ev.target.closest('.sb-gruppe'));
       if (ev.target.id === 'weltsuche') weltSuche(ev);
     });
     rufe('bwLaden').then(function (d) {
@@ -1801,6 +1911,8 @@
       S.ordnerUrl = d.ordnerUrl;
       S.kontoSprache = d.kontoSprache;
       S.standardArten = d.standardArten || {};
+      S.kurzeArten = d.kurzeArten || {};
+      S.fensterZeit = d.fensterStand ? d.fensterStand.zeit : 0;
       S.einst = d.einstellungen;
       S.eintraege = d.eintraege;
       S.beziehungen = d.beziehungen;

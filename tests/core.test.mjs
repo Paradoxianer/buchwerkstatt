@@ -134,3 +134,13 @@ test('HTML wird sicher erzeugt', () => {
   assert.ok(html.startsWith('&lt;b&gt;<button'));
   assert.ok(html.includes('data-id="l"'));
 });
+
+test('Steckbrief: Bereiche, Leitfragen, doppelte und unbekannte Felder', () => {
+  const g = Core.steckbrief(['Spitzname', '# Familie', 'Eltern | Wer sind die Eltern? | Und wo?', 'Eltern', 'Ge:schwister', '# Leer'], { Alter: '34', Spitzname: 'Lenchen', Leer: '' }, 'Weitere');
+  assert.deepEqual(g.map((x) => x.titel), ['', 'Familie', 'Weitere']);
+  assert.deepEqual(g[1].felder, [{ name: 'Eltern', frage: 'Wer sind die Eltern? | Und wo?' }, { name: 'Geschwister', frage: '' }]);
+  assert.deepEqual(g[2].felder.map((f) => f.name), ['Alter'], 'unbekannte, aber ausgefüllte Felder bleiben sichtbar');
+  assert.equal(Core.ausgefuellt(g[0], { Spitzname: 'x' }), 1);
+  assert.deepEqual(Core.feldNamen(['# A', 'x | ?', 'y']), ['x', 'y']);
+  assert.deepEqual(Core.steckbrief(['Alter', 'Beruf']).map((x) => x.titel), [''], 'alte Listen ohne Bereiche');
+});

@@ -40,7 +40,12 @@
   // Sprache des „Google-Kontos“ aus der Adresse: #en, #fr, #es …
   var kontoSprache = (location.hash.match(/\b(de|en|fr|es|it|pt|nl)\b/) || [0, 'de'])[1];
   var standardArten = {};
-  BW_SPRACHEN.forEach(function (s) { standardArten[s] = standardArten_(s); });
+  var kurzeArten = {};
+  BW_SPRACHEN.forEach(function (s) {
+    standardArten[s] = standardArten_(s);
+    kurzeArten[s] = {};
+    standardArten[s].forEach(function (a) { kurzeArten[s][a.id] = kurzeFelder_(s, a.id); });
+  });
   var STANDARD = {
     arten: [
       { id: 'person', name: 'Person', mehrzahl: 'Personen', icon: '👤', farbe: '#3367d6', hell: '#dfe8fb', woerter: ['Person', 'Figur'], karte: true, felder: ['Alter', 'Aussehen', 'Beruf', 'Charakter', 'Herkunft', 'Ziel / Motivation', 'Sprechweise'] },
@@ -62,7 +67,7 @@
   var server = {
     bwLaden: function () {
       return { buch: 'Die Taschenuhr (Roman)', tabelleUrl: '#', ordnerUrl: '#', kontoSprache: kontoSprache,
-        standardArten: standardArten, einstellungen: db.einstellungen, eintraege: db.eintraege, beziehungen: db.beziehungen, ki: { aktiv: db.ki, ende: db.ki ? 'abcd' : '' } };
+        standardArten: standardArten, kurzeArten: kurzeArten, einstellungen: db.einstellungen, eintraege: db.eintraege, beziehungen: db.beziehungen, ki: { aktiv: db.ki, ende: db.ki ? 'abcd' : '' } };
     },
     bwSpeichern: function (e, opt) {
       var neu = !e.id || e.id.indexOf('tmp') === 0;
@@ -123,9 +128,25 @@
     },
     bwKiStatus: function () { return { aktiv: db.ki, ende: 'abcd' }; },
     bwKiSchluesselSetzen: function (k) { db.ki = !!k; return { aktiv: db.ki, ende: 'abcd' }; },
+    bwFensterOeffnen: function (ansicht, start) {
+      window.open('fenster.html#id=' + start.id, '_blank', 'width=980,height=680');
+      return true;
+    },
+    bwFelderSetzen: function (id, aenderungen) {
+      var x = db.eintraege.filter(function (y) { return y.id === id; })[0];
+      if (!x) return null;
+      x.felder = Object.assign({}, x.felder, aenderungen);
+      return x;
+    },
+    bwEintraegeLesen: function (ids) { return db.eintraege.filter(function (y) { return ids.indexOf(y.id) >= 0; }); },
     bwKiFelder: function (a) {
+      var bekannt = { Alter: '34', Aussehen: 'rote Locken, alte Strickjacke der Mutter', Beruf: 'Hebamme', Charakter: 'misstrauisch gegenüber Männern',
+        'Ziel / Motivation': 'will wissen, warum der Vater verschwand', Eltern: 'Vater Heinrich, verschwand 1987 ohne ein Wort', Kleidung: 'immer die alte Strickjacke der Mutter',
+        Wunde: 'vom Vater verlassen', Freunde: 'Jonas, aus der Schulzeit' };
+      var felder = {};
+      a.felder.forEach(function (f) { felder[f] = bekannt[f] || ''; });
       return {
-        felder: { Alter: '34', Aussehen: 'rote Locken, alte Strickjacke der Mutter', Beruf: 'Hebamme', Charakter: 'misstrauisch gegenüber Männern', Herkunft: '', 'Ziel / Motivation': 'will wissen, warum der Vater verschwand', Sprechweise: '' },
+        felder: felder,
         aliase: ['Lenchen', 'die Hebamme'],
         beziehungen: [{ name: 'Jonas', art: 'Schulfreundin von' }]
       };

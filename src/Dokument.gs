@@ -33,7 +33,9 @@ function bwCursor() {
       }
     }
   }
-  if (!el) return null;
+  // Nebenbei: Hat das große Fenster etwas geändert? (siehe fensterStand_)
+  var fenster = fensterStand_();
+  if (!el) return fenster ? { fenster: fenster } : null;
   var tab = aktivesTab_(doc);
   var oben = oberstes_(el);
   var info = oben ? kapitelVon_(inhalt_(doc, tab).getBody(), oben) : { kapitel: '', index: -1 };
@@ -42,7 +44,8 @@ function bwCursor() {
     offset: offset,
     kapitel: info.kapitel,
     pos: info.index,
-    tab: tab ? tab.getId() : ''
+    tab: tab ? tab.getId() : '',
+    fenster: fenster
   };
 }
 

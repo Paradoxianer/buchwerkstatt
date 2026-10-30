@@ -6,6 +6,7 @@
  * - baueIndex:     Alle Namen und „Auch genannt“-Bezeichnungen der Karten.
  * - findeVerweise: Findet Namen und @-Erwähnungen in einem Text.
  * - parseDatum:    Macht aus „12. März“, „3.4.1987“ oder „Tag 5“ eine sortierbare Zahl.
+ * - steckbrief:    Zerlegt die Felder einer Art in Bereiche mit Leitfragen („# Familie“, „Eltern | Wer …?“).
  */
 var BWCore = (function () {
   var BUCHSTABE = /[\p{L}\p{N}_]/u;
@@ -30,6 +31,50 @@ var BWCore = (function () {
     var map = {};
     alleArten(einstellungen).forEach(function (a) { map[a.id] = a; });
     return map;
+  }
+
+  /**
+   * Zerlegt die Feldliste einer Art in Bereiche. Jede Zeile ist „# Bereich“
+   * oder „Feld | Leitfrage“ (die Frage ist optional).
+   * werte: die Felder einer Karte. Was die Art nicht (mehr) kennt, kommt in einen
+   * eigenen Bereich (weitereTitel), damit beim Ändern der Liste nichts verschwindet.
+   * Ergebnis: [{ titel, weitere, felder: [{ name, frage }] }] – titel '' heißt „ohne Bereich“.
+   */
+  function steckbrief(felder, werte, weitereTitel) {
+    var gruppen = [], aktuell = null, gesehen = {};
+    (felder || []).forEach(function (zeile) {
+      zeile = String(zeile || '').trim();
+      if (!zeile) return;
+      if (zeile.charAt(0) === '#') {
+        aktuell = { titel: zeile.replace(/^#+\s*/, ''), felder: [] };
+        gruppen.push(aktuell);
+        return;
+      }
+      var teile = zeile.split('|');
+      // Ohne Doppelpunkt: In der Tabelle steht „Feld: Wert“.
+      var name = teile[0].replace(/:/g, '').trim();
+      if (!name || gesehen[name]) return;
+      gesehen[name] = true;
+      if (!aktuell) { aktuell = { titel: '', felder: [] }; gruppen.push(aktuell); }
+      aktuell.felder.push({ name: name, frage: teile.slice(1).join('|').trim() });
+    });
+    var weitere = Object.keys(werte || {}).filter(function (k) { return !gesehen[k] && String(werte[k] || '').trim(); });
+    if (weitere.length) {
+      gruppen.push({ titel: weitereTitel || '', weitere: true, felder: weitere.map(function (k) { return { name: k, frage: '' }; }) });
+    }
+    return gruppen.filter(function (g) { return g.felder.length; });
+  }
+
+  /** Nur die Feldnamen, in der Reihenfolge des Steckbriefs. */
+  function feldNamen(felder, werte) {
+    var namen = [];
+    steckbrief(felder, werte).forEach(function (g) { g.felder.forEach(function (f) { namen.push(f.name); }); });
+    return namen;
+  }
+
+  /** Wie viele Felder eines Bereichs ausgefüllt sind. */
+  function ausgefuellt(gruppe, werte) {
+    return gruppe.felder.filter(function (f) { return String((werte || {})[f.name] || '').trim(); }).length;
   }
 
   function istBuchstabe(z) {
@@ -345,6 +390,9 @@ var BWCore = (function () {
     NOTIZ_ART: NOTIZ_ART,
     alleArten: alleArten,
     artenMap: artenMap,
+    steckbrief: steckbrief,
+    feldNamen: feldNamen,
+    ausgefuellt: ausgefuellt,
     parseNotiz: parseNotiz,
     baueIndex: baueIndex,
     findeVerweise: findeVerweise,

@@ -1,6 +1,8 @@
 /**
  * Sprachen auf der Server-Seite: Menü, Tabellen-Überschriften, Ordnernamen,
  * Fehlermeldungen und die Standard-Arten (Schlüsselwörter und Felder).
+ * Die ausführlichen Steckbriefe mit Bereichen und Leitfragen stehen in Fragebogen.gs;
+ * die Felder hier sind die kurze Liste.
  *
  * Die Oberfläche der Seitenleiste übersetzt I18n.html.
  * Neue Sprache: hier in BW_TEXTE und BW_STANDARD_ARTEN ergänzen und in I18n.html.
@@ -175,9 +177,15 @@ function standardArten_(sprache) {
     var stil = BW_ART_STIL[a.id];
     return {
       id: a.id, name: a.name, mehrzahl: a.mehrzahl, icon: stil.icon, farbe: stil.farbe, hell: stil.hell,
-      woerter: a.woerter.slice(), karte: stil.karte, felder: a.felder.slice()
+      woerter: a.woerter.slice(), karte: stil.karte, felder: fragebogen_(sprache, a.id) || a.felder.slice()
     };
   });
+}
+
+/** Die kurze Feldliste einer Standard-Art (wie vor den ausführlichen Steckbriefen). */
+function kurzeFelder_(sprache, artId) {
+  var a = (BW_STANDARD_ARTEN[sprache] || BW_STANDARD_ARTEN.en).filter(function (x) { return x.id === artId; })[0];
+  return a ? a.felder.slice() : null;
 }
 
 /** Sprache der Seitenleiste: aus den Einstellungen, sonst aus dem Google-Konto. */

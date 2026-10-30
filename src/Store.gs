@@ -68,14 +68,20 @@ function bwLaden() {
   var props = PropertiesService.getDocumentProperties();
   // Der Buch-Ordner enthält Tabelle und Personenblätter; ältere Versionen hatten nur den Welt-Ordner.
   var ordnerId = props.getProperty(BW_PROP_BUCHORDNER) || props.getProperty(BW_PROP_ORDNER);
-  var standardArten = {};
-  BW_SPRACHEN.forEach(function (s) { standardArten[s] = standardArten_(s); });
+  var standardArten = {}, kurzeArten = {};
+  BW_SPRACHEN.forEach(function (s) {
+    standardArten[s] = standardArten_(s);
+    kurzeArten[s] = {};
+    standardArten[s].forEach(function (a) { kurzeArten[s][a.id] = kurzeFelder_(s, a.id); });
+  });
   return {
     buch: doc.getName(),
     tabelleUrl: ss.getUrl(),
     ordnerUrl: ordnerId ? 'https://drive.google.com/drive/folders/' + ordnerId : '',
     kontoSprache: kontoSprache_(),
     standardArten: standardArten,
+    kurzeArten: kurzeArten,
+    fensterStand: fensterStand_(),
     einstellungen: einstellungen_(),
     eintraege: liesTabelle_(blatt_(ss, BW_EINTRAG), BW_EINTRAG).map(eintragAusZeile_),
     beziehungen: liesTabelle_(blatt_(ss, BW_BEZIEHUNG), BW_BEZIEHUNG),
@@ -213,7 +219,67 @@ function bwBeziehungLoeschen(id) {
   return true;
 }
 
+/**
+ * Ändert einzelne Steckbrief-Felder einer Karte (aus dem großen Fenster).
+ * Nur die übergebenen Felder werden ersetzt, damit gleichzeitige Änderungen
+ * in der Seitenleiste nicht verloren gehen.
+ */
+function bwFelderSetzen(id, aenderungen) {
+  var lock = LockService.getDocumentLock();
+  lock.waitLock(20000);
+  try {
+    var sheet = blatt_(datenbank_(), BW_EINTRAG);
+    var zeile = liesTabelle_(sheet, BW_EINTRAG).filter(function (z) { return z.id === id; })[0];
+    if (!zeile) return null;
+    var felder = felderAusText_(zeile.felder);
+    Object.keys(aenderungen || {}).forEach(function (k) { felder[k] = String(aenderungen[k] || '').trim(); });
+    zeile.felder = felderZuText_(felder);
+    zeile.geaendert = zeitstempel_();
+    schreibeZeile_(sheet, BW_EINTRAG, zeile);
+    fensterMelden_([id]);
+    return eintragAusZeile_(zeile);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/** Liest einzelne Einträge neu – für die Seitenleiste, wenn das große Fenster etwas geändert hat. */
+function bwEintraegeLesen(ids) {
+  return liesTabelle_(blatt_(datenbank_(), BW_EINTRAG), BW_EINTRAG)
+    .filter(function (z) { return ids.indexOf(z.id) >= 0; })
+    .map(eintragAusZeile_);
+}
+
+/* ------------------------------------------------------------------ */
+/* Abgleich zwischen großem Fenster und Seitenleiste                   */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Fenster und Seitenleiste laufen getrennt. Was das Fenster speichert, wird hier
+ * vermerkt; die Seitenleiste fragt den Stand mit dem Cursor ab (bwCursor) und
+ * lädt die genannten Einträge neu.
+ */
+var BW_CACHE_FENSTER = 'BW_FENSTER_STAND';
+
+function fensterMelden_(ids) {
+  var cache = CacheService.getDocumentCache();
+  if (!cache) return;
+  cache.put(BW_CACHE_FENSTER, JSON.stringify({ zeit: Date.now(), ids: ids }), 21600);
+}
+
+/** { zeit, ids } der letzten Änderung aus dem Fenster – oder null. */
+function fensterStand_() {
+  try {
+    var cache = CacheService.getDocumentCache();
+    var roh = cache && cache.get(BW_CACHE_FENSTER);
+    return roh ? JSON.parse(roh) : null;
+  } catch (err) {
+    return null;
+  }
+}
+
 function bwEinstellungenSpeichern(neu) {
+  neu = Object.assign({}, neu, { arten: felderPacken_(neu.arten) });
   PropertiesService.getDocumentProperties().setProperty(BW_PROP_EINST, JSON.stringify(neu));
   bwCacheSprache_ = null;
   return einstellungen_();
@@ -228,7 +294,41 @@ function einstellungen_() {
   var e = JSON.parse(JSON.stringify(BW_STANDARD));
   e.arten = standardArten_(sprache_());
   Object.keys(gespeichert).forEach(function (k) { e[k] = gespeichert[k]; });
+  e.arten = felderEntpacken_(e.arten);
   return e;
+}
+
+/*
+ * Die ausführlichen Steckbriefe sind lang, eine Dokument-Eigenschaft fasst aber
+ * nur 9 KB. Entspricht die Feldliste einer Standard-Art einer Vorlage, wird nur
+ * ein Verweis gespeichert: „fragebogen:de“ oder „kurz:de“.
+ */
+function vorlageVon_(artId, felder) {
+  if (!felder || typeof felder === 'string' || !felder.length) return null;
+  var text = JSON.stringify(felder);
+  for (var i = 0; i < BW_SPRACHEN.length; i++) {
+    var s = BW_SPRACHEN[i];
+    var lang = fragebogen_(s, artId), kurz = kurzeFelder_(s, artId);
+    if (lang && JSON.stringify(lang) === text) return 'fragebogen:' + s;
+    if (kurz && kurz.length && JSON.stringify(kurz) === text) return 'kurz:' + s;
+  }
+  return null;
+}
+
+function felderPacken_(arten) {
+  return (arten || []).map(function (a) {
+    var vorlage = vorlageVon_(a.id, a.felder);
+    return vorlage ? Object.assign({}, a, { felder: vorlage }) : a;
+  });
+}
+
+function felderEntpacken_(arten) {
+  return (arten || []).map(function (a) {
+    if (typeof a.felder !== 'string') return a;
+    var teile = a.felder.split(':');
+    var felder = teile[0] === 'kurz' ? kurzeFelder_(teile[1], a.id) : fragebogen_(teile[1], a.id);
+    return Object.assign({}, a, { felder: felder || [] });
+  });
 }
 
 function einstellungenRoh_() {
@@ -402,19 +502,30 @@ function eintragAusZeile_(z) {
   };
 }
 
-/** Felder werden lesbar gespeichert: eine Zeile pro Feld, „Alter: 34“. */
+/**
+ * Felder werden lesbar gespeichert: eine Zeile pro Feld, „Alter: 34“.
+ * Antworten über mehrere Zeilen werden eingerückt fortgesetzt:
+ *   Kindheit: Wuchs am Hafen auf.
+ *     Der Vater verschwand, als sie fünf war.
+ */
 function felderZuText_(felder) {
   return Object.keys(felder)
     .filter(function (k) { return String(felder[k] || '').trim() !== ''; })
-    .map(function (k) { return k + ': ' + String(felder[k]).replace(/\n/g, ' / '); })
+    .map(function (k) { return k + ': ' + String(felder[k]).trim().split('\n').join('\n  '); })
     .join('\n');
 }
 
 function felderAusText_(text) {
-  var felder = {};
+  var felder = {}, letztes = null;
   String(text || '').split('\n').forEach(function (zeile) {
-    var m = zeile.match(/^([^:]{1,40}):\s?(.*)$/);
-    if (m) felder[m[1].trim()] = m[2].trim();
+    if (/^\s/.test(zeile) && letztes) {
+      felder[letztes] += '\n' + zeile.trim();
+      return;
+    }
+    var m = zeile.match(/^([^:]{1,60}):\s?(.*)$/);
+    if (!m) return;
+    letztes = m[1].trim();
+    felder[letztes] = m[2].trim();
   });
   return felder;
 }

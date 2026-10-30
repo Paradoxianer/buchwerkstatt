@@ -37,14 +37,16 @@ function bwKiSchluesselSetzen(key) {
 }
 
 /**
- * anfrage = { art, name, felder: ['Alter', …], vorhanden: {Alter: '34'}, text, notizen: ['…'], namen: ['Heinrich', …] }
+ * anfrage = { art, name, felder: ['Alter', …], fragen: {Alter: 'Wie alt …?'}, vorhanden: {Alter: '34'}, text, notizen: ['…'], namen: ['Heinrich', …] }
+ * (fragen ist optional: die Leitfragen des Steckbriefs, damit die KI weiß, was gemeint ist.)
  * Antwort  = { felder: {Alter: '…'}, aliase: ['…'], beziehungen: [{name, art}] }
  */
 function bwKiFelder(anfrage) {
   var schluessel = anfrage.felder.map(function (f, i) { return 'f' + i; });
   var eigenschaften = {};
   anfrage.felder.forEach(function (f, i) {
-    eigenschaften[schluessel[i]] = { type: 'string', description: f };
+    var frage = anfrage.fragen && anfrage.fragen[f];
+    eigenschaften[schluessel[i]] = { type: 'string', description: frage ? f + ' – ' + frage : f };
   });
   var schema = {
     type: 'object',
@@ -74,7 +76,8 @@ function bwKiFelder(anfrage) {
 
   var felderListe = anfrage.felder.map(function (f, i) {
     var alt = anfrage.vorhanden && anfrage.vorhanden[f] ? ' (current value: "' + anfrage.vorhanden[f] + '")' : '';
-    return schluessel[i] + ' = ' + f + alt;
+    var frage = anfrage.fragen && anfrage.fragen[f] ? ' – ' + anfrage.fragen[f] : '';
+    return schluessel[i] + ' = ' + f + frage + alt;
   }).join('\n');
 
   var prompt = 'Card: ' + anfrage.art + ' "' + anfrage.name + '"\n\n' +

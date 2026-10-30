@@ -56,3 +56,26 @@ test('Blatt- und Spaltennamen gibt es in jeder Sprache', () => {
     }
   }
 });
+
+test('Ausführliche Steckbriefe: in jeder Sprache gleich aufgebaut, mit allen alten Feldern', async () => {
+  const gs = ['Sprachen.gs', 'Fragebogen.gs'].map((f) => readFileSync(new URL(f, src), 'utf8')).join('\n');
+  const S = new Function(gs + '; return { BW_SPRACHEN, BW_STANDARD_ARTEN, BW_FRAGEBOGEN };')();
+  const Core = (await import('./lade-core.mjs')).default;
+  const aufbau = (liste) => Core.steckbrief(liste).map((g) => g.felder.length);
+  for (const id of ['person', 'ort', 'ding']) {
+    const muster = aufbau(S.BW_FRAGEBOGEN.de[id]);
+    for (const s of S.BW_SPRACHEN) {
+      const liste = S.BW_FRAGEBOGEN[s][id];
+      assert.ok(liste, s + ' ' + id);
+      assert.deepEqual(aufbau(liste), muster, 'gleiche Bereiche ' + s + ' ' + id);
+      const namen = Core.feldNamen(liste);
+      assert.equal(namen.length, liste.filter((z) => !z.startsWith('#')).length, 'keine doppelten Felder ' + s + ' ' + id);
+      liste.filter((z) => !z.startsWith('#')).forEach((z) => {
+        assert.ok(!z.split('|')[0].includes(':'), 'kein Doppelpunkt im Feldnamen: ' + z);
+        assert.ok(z.includes(' | '), 'Leitfrage fehlt: ' + z);
+      });
+      const kurz = S.BW_STANDARD_ARTEN[s].find((a) => a.id === id).felder;
+      for (const f of kurz) assert.ok(namen.includes(f), s + ' ' + id + ': altes Feld fehlt im Fragebogen: ' + f);
+    }
+  }
+});
