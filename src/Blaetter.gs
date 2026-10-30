@@ -24,26 +24,18 @@ function bwBlaetterSync(blaetter) {
 
   // 1. Jede Karte bekommt ein Dokument (fehlende anlegen, umbenannte umbenennen).
   blaetter.forEach(function (b) {
-    var id = blattVon[b.id] || b.blattId;
-    var datei = null;
-    if (id) {
-      try {
-        datei = DriveApp.getFileById(id);
-        if (datei.isTrashed()) datei = null;
-      } catch (err) {
-        datei = null;
-      }
-    }
-    if (!datei) {
+    var info = dateiInfo_(blattVon[b.id] || b.blattId);
+    var id;
+    if (!info || info.trashed) {
       ordner = ordner || weltOrdner_();
-      var neu = DocumentApp.create(b.titel);
-      datei = DriveApp.getFileById(neu.getId());
-      datei.moveTo(ordner);
-    } else if (datei.getName() !== b.titel) {
-      datei.setName(b.titel);
+      id = DocumentApp.create(b.titel).getId();
+      dateiVerschieben_(id, ordner);
+    } else {
+      id = info.id;
+      if (info.name !== b.titel) dateiUmbenennen_(id, b.titel);
     }
-    blattVon[b.id] = datei.getId();
-    ergebnis[b.id] = datei.getId();
+    blattVon[b.id] = id;
+    ergebnis[b.id] = id;
   });
 
   // 2. Inhalte schreiben – jetzt kennen wir alle Ziele für Links.
@@ -93,20 +85,13 @@ function schreibeBlatt_(docId, b, blattVon) {
   doc.saveAndClose();
 }
 
-/** Ordner „<Buch> – Welt“ neben dem Manuskript. */
+/** Ordner „<Buch> – Welt“ im Buch-Ordner. Gibt die Ordner-ID zurück. */
 function weltOrdner_() {
   var props = PropertiesService.getDocumentProperties();
   var id = props.getProperty(BW_PROP_ORDNER);
-  if (id) {
-    try {
-      var vorhanden = DriveApp.getFolderById(id);
-      if (!vorhanden.isTrashed()) return vorhanden;
-    } catch (err) { /* neu anlegen */ }
-  }
+  if (id && dateiNutzbar_(id)) return id;
   var doc = DocumentApp.getActiveDocument();
-  var name = doc.getName() + ' – ' + tx_('ordner');
-  var eltern = DriveApp.getFileById(doc.getId()).getParents();
-  var ordner = eltern.hasNext() ? eltern.next().createFolder(name) : DriveApp.createFolder(name);
-  props.setProperty(BW_PROP_ORDNER, ordner.getId());
-  return ordner;
+  id = ordnerAnlegen_(doc.getName() + ' – ' + tx_('ordner'), buchOrdner_());
+  props.setProperty(BW_PROP_ORDNER, id);
+  return id;
 }

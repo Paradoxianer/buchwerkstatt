@@ -45,11 +45,13 @@ Die Grundidee: **Es gibt nur einen Notizblock.** Das erste Wort einer Notiz ents
   - *Steckbrief ausfüllen*: Die KI liest Beschreibung und alle Notizen zur Karte und schlägt Felder, weitere Namen und Beziehungen vor. Übernommen wird nur, was angehakt ist.
   - *Widersprüche prüfen*: Findet z. B. „grüne Augen“ in Kapitel 3 und „braune Augen“ in Kapitel 17.
 
-Alle Daten liegen in einer **Google-Tabelle** neben dem Manuskript („*Buchtitel* – Buchwerkstatt“). Die Tabelle ist gut lesbar und funktioniert auch in der Google-Tabellen-App. Es gibt keinen eigenen Server, alles bleibt im eigenen Google-Konto.
+Alle Daten liegen in einer **Google-Tabelle** in einem Ordner „*Buchtitel* – Buchwerkstatt“, nach Möglichkeit neben dem Manuskript. Die Buchwerkstatt hat nur Zugriff auf Dateien, die sie selbst angelegt hat (`drive.file`), nicht auf den Rest des Google Drive. Die Tabelle ist gut lesbar und funktioniert auch in der Google-Tabellen-App. Es gibt keinen eigenen Server, alles bleibt im eigenen Google-Konto.
 
 ## Einrichten
 
-Die Erweiterung wird als Apps-Script-Projekt an das Manuskript gehängt. Das muss man nur einmal pro Buch machen.
+**Veröffentlichen im Google Workspace Marketplace:** Schritt für Schritt in [docs/VEROEFFENTLICHEN.md](docs/VEROEFFENTLICHEN.md). Startseite, Datenschutzerklärung und Store-Material liegen in [`docs/`](docs).
+
+Für den eigenen Gebrauch reicht es, die Erweiterung als Apps-Script-Projekt an das Manuskript zu hängen. Das muss man nur einmal pro Buch machen.
 
 ### Variante A – mit `clasp` (empfohlen)
 
@@ -86,7 +88,7 @@ Die Erweiterung wird als Apps-Script-Projekt an das Manuskript gehängt. Das mus
 
 1. Manuskript öffnen → **Erweiterungen → Apps Script**.
 2. Für jede Datei aus dem Ordner [`src/`](src) im Editor über **＋ → Skript** (für `.gs`) bzw. **＋ → HTML** (für `.html`) eine Datei **mit gleichem Namen** anlegen und den Inhalt hineinkopieren:
-   `Main`, `Store`, `Sprachen`, `Dokument`, `Blaetter`, `Ki`, `Statistik` (Skript) sowie `Sidebar`, `Styles`, `I18n`, `I18n_fr`, `I18n_es`, `I18n_it`, `I18n_pt`, `I18n_nl`, `Core`, `App` (HTML). Die vorhandene `Code.gs` kann gelöscht werden.
+   `Main`, `Store`, `Ablage`, `Sprachen`, `Dokument`, `Blaetter`, `Ki`, `Statistik` (Skript) sowie `Sidebar`, `Styles`, `I18n`, `I18n_fr`, `I18n_es`, `I18n_it`, `I18n_pt`, `I18n_nl`, `Core`, `App` (HTML). Die vorhandene `Code.gs` kann gelöscht werden.
 3. **⚙️ Projekteinstellungen → „Manifestdatei appsscript.json im Editor anzeigen“** aktivieren und den Inhalt von [`src/appsscript.json`](src/appsscript.json) übernehmen.
 4. Speichern, das Manuskript neu laden → **Erweiterungen → Buchwerkstatt → Buchwerkstatt öffnen**.
 
@@ -119,6 +121,7 @@ Der Schlüssel wird nur in den Benutzereinstellungen des eigenen Google-Kontos g
 src/            Apps-Script-Projekt (wird mit clasp hochgeladen)
   Main.gs         Menü, Seitenleiste
   Store.gs        Tabelle als Datenablage, Einstellungen
+  Ablage.gs       Drive-Zugriff (nur eigene Dateien, drive.file) über die Drive-API
   Sprachen.gs     Server-Texte und Standard-Schlüsselwörter/Felder je Sprache
   Dokument.gs     Cursor, Textstellen (Named Ranges), Kapitel, Markieren, Vorkommen
   Blaetter.gs     Personenblätter als Google Docs
@@ -131,7 +134,8 @@ src/            Apps-Script-Projekt (wird mit clasp hochgeladen)
   Core.html       Logik ohne Oberfläche: Notiz zerlegen, Namen finden, Datum sortieren
   App.html        Oberfläche
 dev/            Vorschau ohne Google (mock.js ersetzt google.script.run)
-tests/          Tests für Core
+tests/          Tests (Kernlogik, Vollständigkeit der Sprachen, Marketplace-Voraussetzungen)
+docs/           Startseite, Datenschutz, Nutzungsbedingungen (GitHub Pages), Store-Material, Veröffentlichungsanleitung
 ```
 
 ```bash

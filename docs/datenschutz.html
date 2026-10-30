@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Datenschutzerklärung</title>
+  <meta name="description" content="Datenschutzerklärung der Google-Docs-Erweiterung Buchwerkstatt.">
+  <link rel="icon" href="marketplace/icon-128.png">
+  <link rel="stylesheet" href="seite.css">
+</head>
+<body>
+<div class="seite">
+  <header class="kopf">
+    <img src="marketplace/icon-128.png" alt="">
+    <div><h1>Datenschutzerklärung</h1><div class="unter">Buchwerkstatt – Erweiterung für Google Docs · Stand: 30. Oktober 2026</div></div>
+  </header>
+  <nav class="sprachen"><a href="#de">Deutsch</a><a href="#en">English</a></nav>
+
+  <section id="de">
+    <div class="hinweis"><b>Kurz gesagt:</b> Die Buchwerkstatt hat keinen eigenen Server. Alles, was du anlegst, liegt in deinem eigenen Google Drive. Es werden keine Daten an den Entwickler übertragen, es gibt keine Werbung, keine Cookies und keine Auswertung. Nur wenn du freiwillig die KI-Hilfe mit deinem eigenen Schlüssel nutzt, gehen einzelne Texte an Anthropic.</div>
+
+    <h2>1. Verantwortlich</h2>
+    <p><span class="platzhalter">Vorname Nachname</span><br>
+      <span class="platzhalter">Straße Nr., PLZ Ort, Land</span><br>
+      E-Mail: <span class="platzhalter">kontakt@example.com</span></p>
+
+    <h2>2. Welche Daten die Buchwerkstatt verarbeitet</h2>
+    <p>Die Buchwerkstatt läuft als Google-Apps-Script-Erweiterung innerhalb deines Google-Kontos. Sie verarbeitet:</p>
+    <ul>
+      <li><b>Dein geöffnetes Dokument:</b> den Text am Cursor und die Überschriften (um Notizen dem richtigen Kapitel zuzuordnen), die Wortzahl (für das Schreibziel) sowie unsichtbare Markierungen („benannte Bereiche“), mit denen Notizen an Textstellen geheftet werden. Auf Wunsch färbt sie Namen im Text ein.</li>
+      <li><b>Deine Notizen und Karten:</b> Sie werden in einer Google-Tabelle „&lt;Buch&gt; – Buchwerkstatt“ gespeichert, die die Erweiterung in deinem Google Drive anlegt.</li>
+      <li><b>Personenblätter:</b> Auf Wunsch legt die Erweiterung für jede Karte ein kleines Google Doc in einem Ordner „&lt;Buch&gt; – Buchwerkstatt“ an.</li>
+      <li><b>Einstellungen</b> (Sprache, Ziele, Schlüsselwörter) werden in den Eigenschaften des Dokuments gespeichert, ein optionaler KI-Schlüssel in deinen persönlichen Skript-Eigenschaften. Beides ist nur innerhalb deines Google-Kontos gespeichert.</li>
+    </ul>
+    <p>Diese Daten verlassen Google nicht – mit der einzigen Ausnahme der freiwilligen KI-Hilfe (Abschnitt 4). Der Entwickler hat keinen Zugriff darauf.</p>
+
+    <h2>3. Berechtigungen bei Google</h2>
+    <table>
+      <tr><th>Berechtigung</th><th>Wofür</th></tr>
+      <tr><td><code>documents</code></td><td>Das geöffnete Manuskript lesen (Cursor, Überschriften, Wortzahl), Notizen an Textstellen heften, Namen einfärben; die Personenblätter schreiben.</td></tr>
+      <tr><td><code>spreadsheets</code></td><td>Die Tabelle mit deinen Notizen und Karten anlegen, lesen und schreiben.</td></tr>
+      <tr><td><code>drive.file</code></td><td>Die von der Erweiterung angelegten Dateien und Ordner verwalten (umbenennen, in den Buch-Ordner verschieben, gelöschte Karten in den Papierkorb legen). Andere Dateien in deinem Drive sind damit <b>nicht</b> zugänglich.</td></tr>
+      <tr><td><code>script.container.ui</code></td><td>Die Seitenleiste und das Menü in Google Docs anzeigen.</td></tr>
+      <tr><td><code>script.external_request</code></td><td>Nur für die optionale KI-Hilfe: Anfragen an die Anthropic-API senden.</td></tr>
+    </table>
+    <p>Die Nutzung und Weitergabe von Informationen, die die Buchwerkstatt über Google-APIs erhält, an andere Apps erfolgt gemäß der <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, einschließlich der Anforderungen zur eingeschränkten Nutzung („Limited Use“). Daten werden nicht verkauft, nicht für Werbung verwendet und nicht zum Trainieren allgemeiner KI-Modelle weitergegeben.</p>
+
+    <h2>4. Optionale KI-Hilfe (Anthropic Claude)</h2>
+    <p>Die KI-Hilfe ist ausgeschaltet, solange du keinen eigenen API-Schlüssel von Anthropic einträgst. Mit Schlüssel wird nur dann etwas gesendet, wenn du auf einer Karte ausdrücklich „Steckbrief ausfüllen“ oder „Widersprüche prüfen“ anklickst. Dann gehen an die Anthropic-API (<code>api.anthropic.com</code>):</p>
+    <ul>
+      <li>Name, Felder und Beschreibung dieser einen Karte,</li>
+      <li>die Notizen und Zeitstrahl-Einträge, die diese Karte erwähnen (mit Kapitelüberschrift),</li>
+      <li>die Namen der übrigen Karten (damit Beziehungen erkannt werden).</li>
+    </ul>
+    <p>Dein Manuskripttext selbst wird nicht gesendet. Die Anfrage läuft über dein eigenes Anthropic-Konto; dort gelten die <a href="https://www.anthropic.com/legal/privacy">Datenschutzbestimmungen von Anthropic</a>. Der Entwickler der Buchwerkstatt erhält nichts davon. Du kannst die KI jederzeit ausblenden oder den Schlüssel entfernen (Mehr → KI-Hilfe).</p>
+
+    <h2>5. Keine weiteren Empfänger</h2>
+    <p>Die Buchwerkstatt verwendet keine Analyse-Dienste, keine Cookies, keine Werbung und keine eigenen Server. Die Startseite und diese Erklärung werden über GitHub Pages ausgeliefert; dabei verarbeitet GitHub technisch nötige Verbindungsdaten (siehe <a href="https://docs.github.com/de/site-policy/privacy-policies/github-general-privacy-statement">Datenschutzerklärung von GitHub</a>).</p>
+
+    <h2>6. Speicherdauer und Löschen</h2>
+    <p>Die Daten bleiben so lange in deinem Google Drive, bis du sie löschst. So entfernst du alles:</p>
+    <ul>
+      <li>Ordner „&lt;Buch&gt; – Buchwerkstatt“ (Tabelle und Personenblätter) in Google Drive löschen,</li>
+      <li>die Erweiterung in Google Docs über <b>Erweiterungen → Add-ons → Add-ons verwalten</b> entfernen,</li>
+      <li>den Zugriff unter <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a> widerrufen.</li>
+    </ul>
+
+    <h2>7. Deine Rechte</h2>
+    <p>Da der Entwickler keine personenbezogenen Daten von dir speichert, kann er dazu keine Auskunft geben oder Daten löschen – alles liegt in deinem Google-Konto und unter deiner Kontrolle. Für Daten bei Google bzw. Anthropic wende dich an diese Anbieter. Du hast das Recht, dich bei einer Datenschutz-Aufsichtsbehörde zu beschweren. Fragen beantworten wir gern unter der oben genannten Adresse.</p>
+
+    <h2>8. Änderungen</h2>
+    <p>Ändert sich, was die Buchwerkstatt mit Daten tut, wird diese Erklärung angepasst und das Datum oben aktualisiert.</p>
+  </section>
+
+  <section id="en">
+    <h2>English – Privacy policy</h2>
+    <div class="hinweis"><b>In short:</b> Buchwerkstatt has no server of its own. Everything you create stays in your own Google Drive. No data is sent to the developer; there is no advertising, no cookies and no tracking. Only if you choose to use the AI help with your own key are individual texts sent to Anthropic.</div>
+
+    <h3>1. Controller</h3>
+    <p>See section 1 above (German version).</p>
+
+    <h3>2. Data processed</h3>
+    <ul>
+      <li><b>Your open document:</b> text at the cursor and headings (to assign notes to chapters), word count (for the writing goal), and invisible named ranges used to pin notes to passages. On request it highlights names in the text.</li>
+      <li><b>Your notes and cards</b> are stored in a Google Sheet “&lt;Book&gt; – Buchwerkstatt” that the add-on creates in your Google Drive.</li>
+      <li><b>Card documents:</b> on request, one small Google Doc per card in a folder “&lt;Book&gt; – Buchwerkstatt”.</li>
+      <li><b>Settings</b> are stored in document properties; an optional AI key in your personal script properties – both within your Google account only.</li>
+    </ul>
+
+    <h3>3. Google permissions</h3>
+    <p><code>documents</code> – read the open manuscript, pin notes, highlight names, write card documents. <code>spreadsheets</code> – the sheet with your notes. <code>drive.file</code> – manage only the files and folders the add-on created itself; no access to your other files. <code>script.container.ui</code> – show the sidebar and menu. <code>script.external_request</code> – only for the optional AI help (Anthropic API).</p>
+    <p>Buchwerkstatt’s use and transfer to any other app of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the Limited Use requirements. Data is never sold, used for advertising, or shared to train general-purpose AI models.</p>
+
+    <h3>4. Optional AI help (Anthropic Claude)</h3>
+    <p>Off unless you enter your own Anthropic API key. Even then, data is only sent when you explicitly click “Fill in profile” or “Check for contradictions” on a card: the name, fields and description of that card, the notes and timeline entries mentioning it (with chapter heading), and the names of the other cards. Your manuscript text itself is not sent. The request runs through your own Anthropic account under <a href="https://www.anthropic.com/legal/privacy">Anthropic’s privacy policy</a>; the developer receives nothing.</p>
+
+    <h3>5. No other recipients</h3>
+    <p>No analytics, cookies, advertising or own servers. This website is served by GitHub Pages.</p>
+
+    <h3>6. Deletion</h3>
+    <p>Delete the folder “&lt;Book&gt; – Buchwerkstatt” in Google Drive, remove the add-on via <b>Extensions → Add-ons → Manage add-ons</b>, and revoke access at <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>.</p>
+
+    <h3>7. Your rights</h3>
+    <p>The developer stores no personal data about you; everything is in your Google account and under your control. You may lodge a complaint with a data protection authority. Questions: see the contact in section 1.</p>
+  </section>
+
+  <footer>
+    <a href="index.html">Buchwerkstatt</a>
+    <a href="nutzungsbedingungen.html">Nutzungsbedingungen / Terms</a>
+  </footer>
+</div>
+</body>
+</html>

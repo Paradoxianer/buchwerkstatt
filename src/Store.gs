@@ -65,7 +65,9 @@ var BW_STANDARD = {
 function bwLaden() {
   var ss = datenbank_();
   var doc = DocumentApp.getActiveDocument();
-  var ordnerId = PropertiesService.getDocumentProperties().getProperty(BW_PROP_ORDNER);
+  var props = PropertiesService.getDocumentProperties();
+  // Der Buch-Ordner enthält Tabelle und Personenblätter; ältere Versionen hatten nur den Welt-Ordner.
+  var ordnerId = props.getProperty(BW_PROP_BUCHORDNER) || props.getProperty(BW_PROP_ORDNER);
   var standardArten = {};
   BW_SPRACHEN.forEach(function (s) { standardArten[s] = standardArten_(s); });
   return {
@@ -142,7 +144,7 @@ function bwLoeschen(id) {
     if (!alt) return false;
     if (alt.anker) ankerEntfernen_(alt.anker);
     if (alt.blatt) {
-      try { DriveApp.getFileById(alt.blatt).setTrashed(true); } catch (err) { /* schon weg */ }
+      dateiInPapierkorb_(alt.blatt);
     }
     loescheZeile_(sheet, BW_EINTRAG, id);
     var bez = blatt_(ss, BW_BEZIEHUNG);
@@ -244,39 +246,31 @@ function einstellungenRoh_() {
 
 var bwCacheDb_ = null;
 
-/** Öffnet die Tabelle zum Dokument – oder legt sie neben dem Dokument an. */
+/** Öffnet die Tabelle zum Dokument – oder legt sie im Buch-Ordner an. */
 function datenbank_() {
   if (bwCacheDb_) return bwCacheDb_;
   var props = PropertiesService.getDocumentProperties();
   var id = props.getProperty(BW_PROP_DB);
   var ss = null;
   if (id) {
-    try {
-      if (!DriveApp.getFileById(id).isTrashed()) ss = SpreadsheetApp.openById(id);
-    } catch (err) {
-      ss = null;
+    // Nur eine Tabelle im Papierkorb gilt als weg. Ist sie über Drive nicht
+    // erreichbar (z. B. von einer älteren Version angelegt), wird sie trotzdem
+    // geöffnet – sonst würde eine neue, leere Tabelle die Daten „verstecken“.
+    var info = dateiInfo_(id);
+    if (!info || !info.trashed) {
+      try { ss = SpreadsheetApp.openById(id); } catch (err) { ss = null; }
     }
   }
   if (!ss) {
     var doc = DocumentApp.getActiveDocument();
     ss = SpreadsheetApp.create(doc.getName() + ' – Buchwerkstatt');
-    neben_(ss.getId(), doc.getId());
+    try { dateiVerschieben_(ss.getId(), buchOrdner_()); } catch (err) { /* bleibt in „Meine Ablage“ */ }
     var erstes = ss.getSheets()[0];
     erstes.setName(BW_EINTRAG.blatt[sprache_()] || BW_EINTRAG.blatt.en);
     props.setProperty(BW_PROP_DB, ss.getId());
   }
   bwCacheDb_ = ss;
   return ss;
-}
-
-/** Verschiebt eine neu angelegte Datei in den Ordner des Manuskripts. */
-function neben_(dateiId, docId) {
-  try {
-    var eltern = DriveApp.getFileById(docId).getParents();
-    if (eltern.hasNext()) DriveApp.getFileById(dateiId).moveTo(eltern.next());
-  } catch (err) {
-    // Ohne Zugriff auf den Ordner bleibt die Datei in „Meine Ablage“.
-  }
 }
 
 function blatt_(ss, def) {
