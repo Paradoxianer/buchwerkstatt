@@ -11,11 +11,14 @@ Im Google Workspace Marketplace SDK unter **Store-Eintrag** einfügen. Für jede
 ## Deutsch
 
 **Kurzbeschreibung**
-Notizen, Figuren, Orte, Zeitstrahl und Ideen direkt neben deinem Manuskript – die Schreibwerkstatt für Romane in Google Docs.
+Für Romanautorinnen und -autoren: Figuren mit ausführlichem Steckbrief, Orte, Zeitstrahl, Notizen und Schreibziel – direkt neben deinem Manuskript in Google Docs.
 
 **Ausführliche Beschreibung**
 
-Die Buchwerkstatt hält beim Romanschreiben den Überblick – in einer Seitenleiste neben deinem Manuskript.
+Für alle, die einen Roman schreiben – ob erstes Manuskript oder zehntes Buch. Die Buchwerkstatt ist deine Schreibwerkstatt in Google Docs: Figuren, Orte, Zeitstrahl, Ideen und Notizen in einer Seitenleiste direkt neben dem Manuskript. Du schreibst weiter, die Buchwerkstatt behält den Überblick.
+
+FIGUREN, DIE DU WIRKLICH KENNST
+Der ausführliche Steckbrief führt mit Leitfragen durch acht Bereiche – Grunddaten, Aussehen, Familie, Beziehungen, Arbeit & Alltag, Innenleben, Auftreten und die Rolle in der Geschichte. So durchdenkst du jede Figur gründlich. Im großen Fenster ist viel Platz zum Schreiben, ein Fortschrittsbalken zeigt, was noch fehlt. Mit ★ legst du fest, was oben auf der Karte steht. Ein Bild dazu lädst du hoch – oder lässt es dir malen.
 
 EIN NOTIZFELD FÜR ALLES
 Das erste Wort entscheidet, was aus einer Notiz wird:
@@ -26,15 +29,14 @@ Das erste Wort entscheidet, was aus einer Notiz wird:
 • „@Lena hat eine Narbe“ eine Notiz zu Lena
 
 ALLES IST VERKNÜPFT
-Bekannte Namen – auch Spitznamen und Rollen wie „der Vater“ – werden automatisch verlinkt. Jede Karte zeigt, womit sie verbunden ist, welche Notizen sie erwähnen und in welchen Kapiteln sie vorkommt.
+Bekannte Namen – auch Spitznamen und Rollen wie „der Vater“ – werden automatisch verlinkt. Jede Karte zeigt, womit sie verbunden ist, welche Notizen sie erwähnen und in welchen Kapiteln sie vorkommt. Mit 📌 heftest du eine Notiz an einen Absatz oder ein markiertes Wort.
 
-AN DER TEXTSTELLE
-Mit 📌 heftest du eine Notiz an einen Absatz oder an ein markiertes Wort. „Hier“ zeigt die Notizen zum Kapitel, in dem dein Cursor steht. Steht der Cursor auf einem Namen, erscheint die Kurzinfo zur Figur.
+DRANBLEIBEN BIS ZUM LETZTEN KAPITEL
+Gib dein Buchziel und dein Abgabedatum ein und wähle deine Schreibtage – die Buchwerkstatt rechnet aus, wie viele Wörter pro Tag nötig sind, und zeigt deinen Fortschritt.
 
 UND AUSSERDEM
-• Steckbriefe mit frei wählbaren Feldern und Beziehungen („Tochter von“)
-• Zeitstrahl, filterbar nach Figur
-• Ideen-Pinnwand, Schreibziel und Tagesstatistik
+• Zeitstrahl, filterbar nach Figur, und Ideen-Pinnwand
+• Beziehungen zwischen Figuren („Tochter von“), eigene Felder und Kartenarten
 • Personenblätter als Google Docs – so funktioniert @Lena auch in der Docs-App am Handy
 • Sieben Sprachen: Deutsch, Englisch, Französisch, Spanisch, Italienisch, Portugiesisch, Niederländisch
 
@@ -42,18 +44,21 @@ DEINE DATEN BLEIBEN BEI DIR
 Alles liegt in deinem eigenen Google Drive, in einer Tabelle und einem Ordner neben dem Manuskript. Die Buchwerkstatt sieht nur Dateien, die sie selbst angelegt hat. Kein Server, keine Werbung, keine Auswertung.
 
 OPTIONALE KI-HILFE
-Wer möchte, lässt Gemini (Google) oder Claude (Anthropic) mit einem eigenen API-Schlüssel den Steckbrief ausfüllen oder Widersprüche suchen. Die Buchwerkstatt funktioniert vollständig ohne KI.
+Wer möchte, lässt Gemini (Google) oder Claude (Anthropic) mit einem eigenen API-Schlüssel den Steckbrief aus den Notizen ausfüllen oder Widersprüche suchen; Gemini malt auch Bilder der Figuren. Die Buchwerkstatt funktioniert vollständig ohne KI.
 
 ---
 
 ## English
 
 **Short description**
-Notes, characters, places, timeline and ideas right next to your manuscript – the novel-writing workshop for Google Docs.
+For novelists and fiction writers: characters with in-depth profiles, places, timeline, notes and writing goals – right next to your manuscript in Google Docs.
 
 **Detailed description**
 
-Buchwerkstatt keeps track of your novel – in a sidebar next to your manuscript.
+For everyone writing a novel – first manuscript or tenth book. Buchwerkstatt is your writing workshop in Google Docs: characters, places, timeline, ideas and notes in a sidebar right next to your manuscript. You keep writing, Buchwerkstatt keeps track.
+
+CHARACTERS YOU REALLY KNOW
+The in-depth profile guides you with questions through eight areas – basics, appearance, family, relationships, work & everyday life, inner life, presence and their role in the story. That way you think every character through. The large window gives you plenty of room to write, and a progress bar shows what is still missing. Use ★ to choose what appears at the top of the card. Add a picture – upload one or have one painted.
 
 ONE NOTE FIELD FOR EVERYTHING
 The first word decides what a note becomes:
@@ -64,15 +69,14 @@ The first word decides what a note becomes:
 • “@Lena has a scar” a note about Lena
 
 EVERYTHING IS CONNECTED
-Known names – including nicknames and roles like “the father” – are linked automatically. Every card shows what it is connected to, which notes mention it and in which chapters it appears.
+Known names – including nicknames and roles like “the father” – are linked automatically. Every card shows what it is connected to, which notes mention it and in which chapters it appears. Use 📌 to pin a note to a paragraph or a selected word.
 
-RIGHT AT THE PASSAGE
-Use 📌 to pin a note to a paragraph or to a selected word. “Here” shows the notes for the chapter your cursor is in. Put the cursor on a name and the character’s summary appears.
+KEEP GOING TO THE LAST CHAPTER
+Enter your book goal and deadline and pick your writing days – Buchwerkstatt works out how many words per day you need and shows your progress.
 
 AND MORE
-• Profiles with your own fields, and relationships (“daughter of”)
-• Timeline, filterable by character
-• Idea board, writing goal and daily statistics
+• Timeline, filterable by character, and an idea board
+• Relationships between characters (“daughter of”), your own fields and card types
 • Card documents as Google Docs – so @Lena also works in the Docs app on your phone
 • Seven languages: German, English, French, Spanish, Italian, Portuguese, Dutch
 
@@ -80,18 +84,18 @@ YOUR DATA STAYS YOURS
 Everything is stored in your own Google Drive, in a sheet and a folder next to your manuscript. Buchwerkstatt only sees files it created itself. No server, no ads, no tracking.
 
 OPTIONAL AI HELP
-If you like, Gemini (Google) or Claude (Anthropic) can fill in profiles or look for contradictions using your own API key. Buchwerkstatt works fully without AI.
+If you like, Gemini (Google) or Claude (Anthropic) can fill in profiles from your notes or look for contradictions, using your own API key; Gemini can also paint pictures of your characters. Buchwerkstatt works fully without AI.
 
 ---
 
 ## Kurzbeschreibungen weiterer Sprachen
 
-**Français:** Notes, personnages, lieux, chronologie et idées juste à côté de ton manuscrit – l’atelier d’écriture de romans pour Google Docs.
+**Français :** Pour romancières et romanciers : personnages avec fiches détaillées, lieux, chronologie, notes et objectif d’écriture – juste à côté de ton manuscrit dans Google Docs.
 
-**Español:** Notas, personajes, lugares, cronología e ideas junto a tu manuscrito: el taller de escritura de novelas para Google Docs.
+**Español:** Para novelistas: personajes con fichas detalladas, lugares, cronología, notas y objetivos de escritura, junto a tu manuscrito en Google Docs.
 
-**Italiano:** Note, personaggi, luoghi, cronologia e idee accanto al tuo manoscritto – il laboratorio di scrittura per romanzi in Google Docs.
+**Italiano:** Per scrittrici e scrittori di romanzi: personaggi con schede dettagliate, luoghi, cronologia, note e obiettivi di scrittura – accanto al tuo manoscritto in Google Docs.
 
-**Português:** Notas, personagens, lugares, linha do tempo e ideias ao lado do seu manuscrito – a oficina de escrita de romances para o Google Docs.
+**Português:** Para romancistas: personagens com fichas detalhadas, lugares, linha do tempo, notas e metas de escrita – ao lado do seu manuscrito no Google Docs.
 
-**Nederlands:** Notities, personages, plaatsen, tijdlijn en ideeën naast je manuscript – de schrijfwerkplaats voor romans in Google Docs.
+**Nederlands:** Voor romanschrijvers: personages met uitgebreide profielen, plaatsen, tijdlijn, notities en schrijfdoelen – naast je manuscript in Google Docs.

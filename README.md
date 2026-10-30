@@ -2,7 +2,7 @@
 
 *🇬🇧 English summary [below](#english).*
 
-Eine Erweiterung für **Google Docs**, die beim Romanschreiben den Überblick behält: Notizen, Figuren, Orte, Gegenstände, Zeitstrahl, Ideen-Pinnwand und Schreibziel stehen direkt neben dem Manuskript.
+**Für alle, die einen Roman schreiben.** Eine Erweiterung für **Google Docs**, die beim Romanschreiben den Überblick behält: Figuren mit ausführlichem Steckbrief, Orte, Gegenstände, Zeitstrahl, Ideen-Pinnwand, Notizen und Schreibziel stehen direkt neben dem Manuskript.
 
 Die Grundidee: **Es gibt nur einen Notizblock.** Das erste Wort einer Notiz entscheidet, was daraus wird:
 
@@ -174,7 +174,7 @@ npm run vorschau
 
 ## English
 
-**Buchwerkstatt** (“book workshop”) is a Google Docs add-on for novelists: notes, characters, places, objects, a timeline, an idea board and a writing goal, right next to your manuscript. It works **entirely without AI**. Claude can optionally fill in character profiles and look for contradictions.
+**For everyone writing a novel.** **Buchwerkstatt** (“book workshop”) is a Google Docs add-on for novelists: characters with in-depth profiles, places, objects, a timeline, an idea board, notes and a writing goal, right next to your manuscript. It works **entirely without AI**. Gemini or Claude can optionally fill in character profiles, look for contradictions, and (Gemini) paint character pictures.
 
 There is just one note field, and the first word decides what a note becomes:
 
