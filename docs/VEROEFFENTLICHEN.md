@@ -111,7 +111,7 @@ Der Marketplace verweist auf eine feste, versionierte **Bereitstellung**:
 npx clasp deploy --description "1.0"
 ```
 
-Die ausgegebene **Bereitstellungs-ID** (beginnt mit `AKfycb…`) notieren. Sie wird in Schritt 6 gebraucht und bei Updates wiederverwendet.
+Die ausgegebene **Versionsnummer** (`Created version 1`) und die **Bereitstellungs-ID** (beginnt mit `AKfycb…`) notieren. Im Marketplace SDK (Schritt 6) werden für ein Editor-Add-on Skript-ID und Versionsnummer eingetragen; die Bereitstellungs-ID wird bei Updates wiederverwendet.
 
 ## 6. Marketplace SDK
 
@@ -121,8 +121,9 @@ Cloud Console → **Google Workspace Marketplace SDK → App-Konfiguration**:
 |---|---|
 | App-Sichtbarkeit | Öffentlich (mit einem privaten gmail.com-Konto ist nur „öffentlich“ möglich; „nicht gelistet“ blendet die App in der Suche aus) |
 | Installationseinstellungen | Individuelle Installation (und Admin-Installation erlauben) |
-| App-Integration | **Google Workspace-Add-on** → *Editor-Add-on* → **Docs-Erweiterung** |
-| Apps-Script-Projekt | Bereitstellungs-ID aus Schritt 5 |
+| App-Integration | **„Google Workspace-Add-on“ NICHT anhaken** (das ist für Add-ons mit Karten-Oberfläche). Stattdessen weiter unten **„Docs-Add-on“** anhaken – die Buchwerkstatt ist ein Editor-Add-on mit eigener Seitenleiste. |
+| Skript-ID | die Skript-ID des Apps-Script-Projekts (⚙️ Projekteinstellungen, steht auch in `.clasp.json`) |
+| Skriptversion | die Versionsnummer aus Schritt 5 (`Created version 1` → `1`) |
 | OAuth-Bereiche | dieselben fünf wie oben |
 | Entwickler | Name, Website (`https://paradoxianer.github.io/buchwerkstatt/`), E-Mail |
 
@@ -168,17 +169,19 @@ Ist die OAuth-Überprüfung durch, im Marketplace SDK unter **Store-Eintrag → 
 
 ## 9. Updates
 
-Neue Versionen ändern die bestehende Bereitstellung, die Marketplace-Konfiguration bleibt gleich:
+Bei einem Editor-Add-on verweist der Marketplace auf eine **Versionsnummer** des Skripts. Für ein Update eine neue Version anlegen und deren Nummer eintragen:
 
 ```bash
-npm test && npx clasp push --force
+npm test && npm run push
 ```
 
 ```bash
-npx clasp deploy --deploymentId AKfycb… --description "1.1"
+npx clasp deploy --deploymentId AKfycb… --description "0.3.0"
 ```
 
-Alle Nutzerinnen und Nutzer bekommen die neue Version automatisch. Nur wenn neue **Bereiche** dazukommen, muss die OAuth-Überprüfung erneut durchlaufen werden.
+clasp meldet dabei `Created version N`. Im Marketplace SDK unter **App-Konfiguration → Skriptversion** die neue Nummer `N` eintragen und speichern.
+
+Alle Nutzerinnen und Nutzer bekommen die neue Version dann automatisch. Nur wenn neue **Bereiche** dazukommen, muss die OAuth-Überprüfung erneut durchlaufen werden.
 
 ---
 
