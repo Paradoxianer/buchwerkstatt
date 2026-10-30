@@ -1645,6 +1645,9 @@
       '<div class="unter">' + th('einst.ki.privat') + '</div></div>';
 
     html += '<div class="block"><div class="block-titel">' + th('einst.hilfe') + '</div><button class="knopf klein" data-aktion="hilfe-an">' + th('einst.hilfeAn') + '</button></div>';
+    // Welcher Stand läuft gerade? (Version · hochgeladen am · Git-Commit)
+    var v = S.version;
+    html += '<div class="version">Buchwerkstatt ' + (v ? h(v.nummer) + ' · ' + h(new Date(v.stand.slice(0, 10) + 'T12:00:00').toLocaleDateString(I.locale()) + ', ' + v.stand.slice(11)) + ' · ' + h(v.commit) : 'dev') + '</div>';
     return html;
   }
 
@@ -2005,6 +2008,7 @@
       S.tabelleUrl = d.tabelleUrl;
       S.ordnerUrl = d.ordnerUrl;
       S.kontoSprache = d.kontoSprache;
+      S.version = d.version;
       S.standardArten = d.standardArten || {};
       S.kurzeArten = d.kurzeArten || {};
       S.fensterZeit = d.fensterStand ? d.fensterStand.zeit : 0;

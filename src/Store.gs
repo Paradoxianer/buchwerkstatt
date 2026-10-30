@@ -81,6 +81,8 @@ function bwLaden() {
     tabelleUrl: ss.getUrl(),
     ordnerUrl: ordnerId ? 'https://drive.google.com/drive/folders/' + ordnerId : '',
     kontoSprache: kontoSprache_(),
+    // src/Version.gs entsteht erst beim Hochladen (npm run push).
+    version: typeof BW_VERSION !== 'undefined' ? BW_VERSION : null,
     standardArten: standardArten,
     kurzeArten: kurzeArten,
     fensterStand: fensterStand_(),

@@ -66,7 +66,7 @@
 
   var server = {
     bwLaden: function () {
-      return { buch: 'Die Taschenuhr (Roman)', tabelleUrl: '#', ordnerUrl: '#', kontoSprache: kontoSprache,
+      return { buch: 'Die Taschenuhr (Roman)', tabelleUrl: '#', ordnerUrl: '#', kontoSprache: kontoSprache, version: { nummer: '0.2.0', stand: '2026-10-30 10:52', commit: '2a1db94' },
         standardArten: standardArten, kurzeArten: kurzeArten, einstellungen: db.einstellungen, eintraege: db.eintraege, beziehungen: db.beziehungen, ki: { aktiv: db.ki, ende: db.ki ? 'abcd' : '' } };
     },
     bwSpeichern: function (e, opt) {
