@@ -3,7 +3,7 @@
 Im Google Workspace Marketplace SDK unter **Store-Eintrag** einfügen. Für jede Sprache lässt sich ein eigener Eintrag hinterlegen (Kurzbeschreibung höchstens 200 Zeichen).
 
 **App-Name:** Buchwerkstatt
-**Kategorie:** Produktivität (bzw. „Office-Anwendungen“, je nach Auswahl)
+**Kategorie:** Kreativ-Tools (Creative Tools)
 **Preis:** kostenlos
 
 ---

@@ -132,7 +132,7 @@ Dann **Store-Eintrag**:
 | Feld | Datei bzw. Text |
 |---|---|
 | Name, Kurz- und Detailbeschreibung | `docs/marketplace/eintrag.md` (pro Sprache eintragen) |
-| Kategorie | Produktivität |
+| Kategorie | Kreativ-Tools (eine Kategorie „Produktivität“ gibt es nicht) |
 | Anwendungssymbol 32 × 32 / 128 × 128 | `docs/marketplace/icon-32.png`, `icon-128.png` |
 | Kartenbanner 220 × 140 | `docs/marketplace/banner-220x140.png` |
 | Screenshots 1280 × 800 | `docs/marketplace/screenshot-1-notizen.png` … `screenshot-5-ziel.png` |
