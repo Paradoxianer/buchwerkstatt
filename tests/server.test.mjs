@@ -159,7 +159,7 @@ function welt() {
     CacheService: { getDocumentCache: () => cache }
   };
   const namen = Object.keys(globals);
-  const fns = new Function(...namen, code + '; return { bwSpeichern, bwBlaetterSync, bwLoeschen, bwLaden, datenbank_, bwFelderSetzen, bwEintraegeLesen, bwEinstellungenSpeichern, bwObenSetzen, bwTabelleNeuAnlegen, bwBildSetzen, bwBildEntfernen, einstellungen_, fragebogen_, kurzeFelder_, namensmuster_, fundstellen_, neueAusfuehrung: function () { bwCacheDb_ = null; bwCacheSprache_ = null; } };')(...namen.map((n) => globals[n]));
+  const fns = new Function(...namen, code + '; return { bwSpeichern, bwBlaetterSync, bwLoeschen, bwLaden, datenbank_, bwFelderSetzen, bwEintraegeLesen, bwEinstellungenSpeichern, bwObenSetzen, bwTabelleNeuAnlegen, bwBildSetzen, bwBildEntfernen, einstellungen_, fragebogen_, kurzeFelder_, namensmuster_, fundstellen_, bwReihenfolgeSetzen, bwWerteSetzen, bwFensterLoeschen, fensterStand_, neueAusfuehrung: function () { bwCacheDb_ = null; bwCacheSprache_ = null; } };')(...namen.map((n) => globals[n]));
   return { fns, dateien, docs, dokProps, zugriff, tabellen };
 }
 
@@ -347,4 +347,25 @@ test('Fundstellen: ganze Wörter mit Genitiv, Nummer im Absatz und Text drumheru
   assert.equal(funde[2].vor, '…lachte. Später sah Lena den Fluss, und ', 'vorne an Wortgrenze gekürzt');
   assert.ok(funde[2].nach.endsWith('…') && !funde[2].nach.includes('Mantels'), 'an Wortgrenze gekürzt');
   assert.equal(fns.namensmuster_(['x', '']), null);
+});
+
+test('Zeitstrahl: Reihenfolge und einzelne Werte speichern, Seitenleiste erfährt alles', () => {
+  const { fns } = welt();
+  const a = fns.bwSpeichern({ art: 'zeit', name: '3.4.1914', text: 'Ausbruch des Krieges' }, {});
+  const b = fns.bwSpeichern({ art: 'zeit', name: 'zwei Tage vor dem Krieg', text: 'Abschied' }, {});
+  const c = fns.bwSpeichern({ art: 'zeit', name: 'Vor dem Krieg', text: '', status: 'abschnitt' }, {});
+  fns.bwReihenfolgeSetzen([c.id, b.id, a.id], true);
+  const reihe = () => Object.fromEntries(fns.bwLaden().eintraege.map((e) => [e.id, e.reihe]));
+  assert.deepEqual(reihe(), { [c.id]: '1', [b.id]: '2', [a.id]: '3' });
+
+  fns.bwWerteSetzen(b.id, { text: 'Abschied am Bahnhof' });
+  const neu = fns.bwLaden().eintraege.find((e) => e.id === b.id);
+  assert.equal(neu.text, 'Abschied am Bahnhof');
+  assert.equal(neu.name, 'zwei Tage vor dem Krieg', 'nur der Text geändert');
+  assert.equal(neu.reihe, '2', 'Reihenfolge bleibt');
+
+  fns.bwFensterLoeschen(a.id);
+  const stand = fns.fensterStand_();
+  for (const id of [a.id, b.id, c.id]) assert.ok(stand.ids.includes(id), 'alle Änderungen gemeldet, nicht nur die letzte');
+  assert.equal(fns.bwLaden().eintraege.length, 2);
 });

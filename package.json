@@ -1,6 +1,6 @@
 {
   "name": "buchwerkstatt",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Google-Docs-Erweiterung für Romanautor:innen: Notizen, Figuren, Orte, Zeitstrahl und Pinnwand neben dem Manuskript.",
   "private": true,
   "type": "module",

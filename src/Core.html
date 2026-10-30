@@ -6,6 +6,7 @@
  * - baueIndex:     Alle Namen und „Auch genannt“-Bezeichnungen der Karten.
  * - findeVerweise: Findet Namen und @-Erwähnungen in einem Text.
  * - parseDatum:    Macht aus „12. März“, „3.4.1987“ oder „Tag 5“ eine sortierbare Zahl.
+ * - zeitReihe:     Reihenfolge im Zeitstrahl: von Hand geordnet, Neues nach Datum eingefügt.
  * - schreibplan:   Wörter pro Tag bis zum Zieldatum (nur an Schreibtagen).
  * - obenFelder:    Welche Steckbrief-Felder einen Stern haben (oben auf der Karte).
  * - steckbrief:    Zerlegt die Felder einer Art in Bereiche mit Leitfragen („# Familie“, „Eltern | Wer …?“).
@@ -379,6 +380,51 @@ var BWCore = (function () {
     return null;
   }
 
+  /** Die von Hand gesetzte Position („reihe“) – oder null. */
+  function reihe(e) {
+    var n = parseFloat(e && e.reihe);
+    return isNaN(n) ? null : n;
+  }
+
+  /**
+   * Reihenfolge im Zeitstrahl. Was der Autor von Hand geordnet hat, bleibt so –
+   * viele Angaben sind relativ („zwei Tage vor dem Krieg“) und lassen sich nicht ausrechnen.
+   * Ereignisse ohne Position (neu, nie verschoben) kommen nach Datum dazu: vor das
+   * erste Ereignis mit späterem Datum, ohne erkennbares Datum ans Ende.
+   */
+  function zeitReihe(alle, standardJahr) {
+    var datum = function (e) { return parseDatum(e.name, standardJahr); };
+    var geordnet = alle.filter(function (e) { return reihe(e) != null; })
+      .sort(function (a, b) { return reihe(a) - reihe(b); });
+    alle.filter(function (e) { return reihe(e) == null; })
+      .sort(function (a, b) {
+        var da = datum(a), db = datum(b);
+        if (da != null && db != null && da !== db) return da - db;
+        if ((da == null) !== (db == null)) return da == null ? 1 : -1;
+        return String(a.erstellt).localeCompare(String(b.erstellt));
+      })
+      .forEach(function (e) {
+        var d = datum(e), pos = geordnet.length;
+        if (d != null) {
+          for (var i = 0; i < geordnet.length; i++) {
+            var x = datum(geordnet[i]);
+            if (x != null && x > d) { pos = i; break; }
+          }
+        }
+        geordnet.splice(pos, 0, e);
+      });
+    return geordnet;
+  }
+
+  /** Neue Reihenfolge von IDs: id vor (oder nach) zielId verschoben. */
+  function verschiebe(ids, id, zielId, danach) {
+    var liste = ids.filter(function (x) { return x !== id; });
+    var i = liste.indexOf(zielId);
+    if (i < 0) return ids.slice();
+    liste.splice(danach ? i + 1 : i, 0, id);
+    return liste;
+  }
+
   function jahr(j, standardJahr) {
     if (!j) return standardJahr || 0;
     var n = Number(j);
@@ -448,6 +494,9 @@ var BWCore = (function () {
     verweisIds: verweisIds,
     verbindungen: verbindungen,
     parseDatum: parseDatum,
+    reihe: reihe,
+    zeitReihe: zeitReihe,
+    verschiebe: verschiebe,
     haeufigstesJahr: haeufigstesJahr,
     textMitVerweisen: textMitVerweisen,
     escapeHtml: escapeHtml,

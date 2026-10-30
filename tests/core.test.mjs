@@ -166,3 +166,23 @@ test('Schreibplan: Wörter pro Tag bis zum Zieldatum, nur an Schreibtagen', () =
   assert.equal(Core.schreibplan({ gesamtziel: 1000, zieldatum: '2026-12-01', heute: '2026-10-30', woerterMorgen: 1200 }).fertig, true);
   assert.equal(Core.schreibplan({ gesamtziel: 0, zieldatum: '2026-12-01', heute: '2026-10-30' }), null);
 });
+
+test('Zeitstrahl: von Hand geordnet bleibt, Neues kommt nach Datum dazu', () => {
+  const z = (id, name, reihe, erstellt = id) => ({ id, name, reihe, erstellt });
+  const ids = (l) => l.map((e) => e.id);
+  // Ohne Handordnung: nach Datum, ohne Datum ans Ende.
+  assert.deepEqual(ids(Core.zeitReihe([z('a', 'zwei Tage vor dem Krieg'), z('b', '3.4.1914'), z('c', '1.1.1914')])), ['c', 'b', 'a']);
+  // Von Hand: relative Angabe vor beide Daten gezogen.
+  const hand = [z('a', 'zwei Tage vor dem Krieg', '1'), z('c', '1.1.1914', '2'), z('b', '3.4.1914', '3')];
+  assert.deepEqual(ids(Core.zeitReihe(hand)), ['a', 'c', 'b']);
+  // Neues Ereignis mit Datum: vor das erste spätere.
+  assert.deepEqual(ids(Core.zeitReihe(hand.concat([z('d', '1.2.1914')]))), ['a', 'c', 'd', 'b']);
+  // Neues ohne Datum: ans Ende.
+  assert.deepEqual(ids(Core.zeitReihe(hand.concat([z('e', 'irgendwann')]))), ['a', 'c', 'b', 'e']);
+});
+
+test('Verschieben in einer Liste', () => {
+  assert.deepEqual(Core.verschiebe(['a', 'b', 'c', 'd'], 'd', 'b'), ['a', 'd', 'b', 'c']);
+  assert.deepEqual(Core.verschiebe(['a', 'b', 'c', 'd'], 'a', 'c', true), ['b', 'c', 'a', 'd']);
+  assert.deepEqual(Core.verschiebe(['a', 'b'], 'a', 'x'), ['a', 'b']);
+});

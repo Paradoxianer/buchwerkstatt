@@ -29,6 +29,8 @@
       { id: 'n2', art: 'notiz', name: '', text: 'Szene am Kai kürzen – zu viel Beschreibung. Vielleicht trifft sie hier schon @Kowalski?', felder: {}, bezug: [], status: '', anker: '|nr4', kapitel: kapitel[1], blatt: '', erstellt: '2026-10-24 08:05', geaendert: '' },
       { id: 'z1', art: 'zeit', name: '3. Februar 1987', text: 'Heinrich verschwindet.', felder: {}, bezug: [], status: '', anker: '', kapitel: '', blatt: '', erstellt: '2026-10-24 08:10', geaendert: '' },
       { id: 'z2', art: 'zeit', name: '12. März', text: 'Lena trifft Jonas am Hafen.', felder: {}, bezug: [], status: '', anker: '', kapitel: '', blatt: '', erstellt: '2026-10-24 08:11', geaendert: '' },
+      { id: 'z3', art: 'zeit', name: 'zwei Tage nach Heinrichs Verschwinden', text: 'Die Polizei findet sein Boot leer im Hafen.', felder: {}, bezug: [], status: '', anker: '', kapitel: '', blatt: '', erstellt: '2026-10-24 08:12', geaendert: '' },
+      { id: 'z4', art: 'zeit', name: 'Sommer, Jahre später', text: 'Lena kehrt zurück und findet die Taschenuhr.', felder: {}, bezug: [], status: '', anker: '', kapitel: '', blatt: '', erstellt: '2026-10-24 08:13', geaendert: '' },
       { id: 'i1', art: 'idee', name: '', text: 'Was, wenn Jonas Heinrichs Sohn aus zweiter Ehe ist?', felder: {}, bezug: [], status: 'offen', anker: '', kapitel: '', blatt: '', erstellt: '2026-10-25 22:00', geaendert: '' },
       { id: 'i2', art: 'idee', name: '', text: 'Die Taschenuhr bleibt immer um 4:17 stehen.', felder: {}, bezug: [], status: 'verwendet', anker: '', kapitel: '', blatt: '', erstellt: '2026-10-25 22:05', geaendert: '' }
     ],
@@ -165,8 +167,28 @@
       return { aktiv: db.ki, ende: 'abcd', anbieter: db.kiAnbieter };
     },
     bwFensterOeffnen: function (ansicht, start) {
-      window.open('fenster.html#id=' + start.id, '_blank', 'width=980,height=680');
+      window.open('fenster.html#' + (ansicht === 'zeitstrahl' ? 'zeit' : 'id=' + start.id), '_blank', 'width=980,height=680');
       return true;
+    },
+    bwReihenfolgeSetzen: function (ids) {
+      var neu = {};
+      ids.forEach(function (id, i) { neu[id] = i + 1; });
+      db.eintraege.forEach(function (y) { if (y.id in neu) y.reihe = String(neu[y.id]); });
+      return neu;
+    },
+    bwWerteSetzen: function (id, werte) {
+      var x = db.eintraege.filter(function (y) { return y.id === id; })[0];
+      if (!x) return null;
+      ['name', 'text', 'status'].forEach(function (k) { if (werte[k] != null) x[k] = werte[k]; });
+      return x;
+    },
+    bwFensterLoeschen: function (id) { db.eintraege = db.eintraege.filter(function (y) { return y.id !== id; }); return true; },
+    bwKiZeitOrdnen: function (liste) {
+      // Beispiel: relative Angabe nach ihrem Bezugsereignis
+      var ids = liste.map(function (z) { return z.id; });
+      var i = ids.indexOf('z3');
+      if (i >= 0) { ids.splice(i, 1); ids.splice(ids.indexOf('z1') + 1, 0, 'z3'); }
+      return { reihenfolge: ids, hinweise: [{ id: 'z3', text: '„zwei Tage nach Heinrichs Verschwinden“ bezieht sich auf den 3. Februar 1987.' }] };
     },
     bwObenSetzen: function (artId, oben) {
       db.einstellungen.arten.forEach(function (a) { if (a.id === artId) a.oben = oben; });

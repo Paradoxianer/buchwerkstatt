@@ -17,17 +17,17 @@ var BW_PROP_ORDNER = 'BW_ORDNER';
 
 var BW_EINTRAG = {
   blatt: { de: 'Einträge', en: 'Entries', fr: 'Entrées', es: 'Entradas', it: 'Voci', pt: 'Entradas', nl: 'Items' },
-  felder: ['id', 'art', 'name', 'aliase', 'text', 'felder', 'bezug', 'status', 'anker', 'kapitel', 'blatt', 'erstellt', 'geaendert', 'ankertext'],
+  felder: ['id', 'art', 'name', 'aliase', 'text', 'felder', 'bezug', 'status', 'anker', 'kapitel', 'blatt', 'erstellt', 'geaendert', 'ankertext', 'reihe'],
   koepfe: {
-    de: ['ID', 'Art', 'Name', 'Auch genannt', 'Text', 'Felder', 'Bezug', 'Status', 'Textstelle', 'Kapitel', 'Blatt', 'Erstellt', 'Geändert', 'Angeheftet an'],
-    en: ['ID', 'Type', 'Name', 'Also called', 'Text', 'Fields', 'Linked to', 'Status', 'Passage', 'Chapter', 'Document', 'Created', 'Changed', 'Pinned to'],
-    fr: ['ID', 'Type', 'Nom', 'Aussi appelé', 'Texte', 'Champs', 'Lié à', 'Statut', 'Passage', 'Chapitre', 'Document', 'Créé', 'Modifié', 'Épinglé à'],
-    es: ['ID', 'Tipo', 'Nombre', 'También llamado', 'Texto', 'Campos', 'Vinculado a', 'Estado', 'Pasaje', 'Capítulo', 'Documento', 'Creado', 'Modificado', 'Fijado a'],
-    it: ['ID', 'Tipo', 'Nome', 'Detto anche', 'Testo', 'Campi', 'Collegato a', 'Stato', 'Passaggio', 'Capitolo', 'Documento', 'Creato', 'Modificato', 'Fissato a'],
-    pt: ['ID', 'Tipo', 'Nome', 'Também chamado', 'Texto', 'Campos', 'Ligado a', 'Estado', 'Passagem', 'Capítulo', 'Documento', 'Criado', 'Alterado', 'Fixado em'],
-    nl: ['ID', 'Soort', 'Naam', 'Ook genoemd', 'Tekst', 'Velden', 'Gekoppeld aan', 'Status', 'Passage', 'Hoofdstuk', 'Document', 'Gemaakt', 'Gewijzigd', 'Vastgemaakt aan']
+    de: ['ID', 'Art', 'Name', 'Auch genannt', 'Text', 'Felder', 'Bezug', 'Status', 'Textstelle', 'Kapitel', 'Blatt', 'Erstellt', 'Geändert', 'Angeheftet an', 'Reihenfolge'],
+    en: ['ID', 'Type', 'Name', 'Also called', 'Text', 'Fields', 'Linked to', 'Status', 'Passage', 'Chapter', 'Document', 'Created', 'Changed', 'Pinned to', 'Order'],
+    fr: ['ID', 'Type', 'Nom', 'Aussi appelé', 'Texte', 'Champs', 'Lié à', 'Statut', 'Passage', 'Chapitre', 'Document', 'Créé', 'Modifié', 'Épinglé à', 'Ordre'],
+    es: ['ID', 'Tipo', 'Nombre', 'También llamado', 'Texto', 'Campos', 'Vinculado a', 'Estado', 'Pasaje', 'Capítulo', 'Documento', 'Creado', 'Modificado', 'Fijado a', 'Orden'],
+    it: ['ID', 'Tipo', 'Nome', 'Detto anche', 'Testo', 'Campi', 'Collegato a', 'Stato', 'Passaggio', 'Capitolo', 'Documento', 'Creato', 'Modificato', 'Fissato a', 'Ordine'],
+    pt: ['ID', 'Tipo', 'Nome', 'Também chamado', 'Texto', 'Campos', 'Ligado a', 'Estado', 'Passagem', 'Capítulo', 'Documento', 'Criado', 'Alterado', 'Fixado em', 'Ordem'],
+    nl: ['ID', 'Soort', 'Naam', 'Ook genoemd', 'Tekst', 'Velden', 'Gekoppeld aan', 'Status', 'Passage', 'Hoofdstuk', 'Document', 'Gemaakt', 'Gewijzigd', 'Vastgemaakt aan', 'Volgorde']
   },
-  breiten: [90, 80, 160, 160, 360, 260, 90, 80, 90, 160, 90, 120, 120, 140]
+  breiten: [90, 80, 160, 160, 360, 260, 90, 80, 90, 160, 90, 120, 120, 140, 90]
 };
 
 var BW_BEZIEHUNG = {
@@ -120,7 +120,8 @@ function bwSpeichern(eintrag, optionen) {
       blatt: eintrag.blatt || '',
       erstellt: eintrag.erstellt || jetzt,
       geaendert: jetzt,
-      ankertext: eintrag.ankertext || ''
+      ankertext: eintrag.ankertext || '',
+      reihe: eintrag.reihe != null ? String(eintrag.reihe) : ''
     };
     var stelle = null;
     if (optionen.anheften && !e.anker) {
@@ -137,6 +138,7 @@ function bwSpeichern(eintrag, optionen) {
       ergebnis.pos = stelle.pos;
       ergebnis.tab = stelle.tab;
     }
+    if (optionen.melden) fensterMelden_([e.id]);
     return ergebnis;
   } finally {
     lock.releaseLock();
@@ -249,6 +251,64 @@ function bwFelderSetzen(id, aenderungen) {
   }
 }
 
+/**
+ * Setzt einzelne Werte (name, text, status) eines Eintrags – aus dem großen Fenster.
+ * Wie bwFelderSetzen: nur diese Werte, damit nichts aus der Seitenleiste überschrieben wird.
+ */
+function bwWerteSetzen(id, werte) {
+  var lock = LockService.getDocumentLock();
+  lock.waitLock(20000);
+  try {
+    var sheet = blatt_(datenbank_(), BW_EINTRAG);
+    var zeile = liesTabelle_(sheet, BW_EINTRAG).filter(function (z) { return z.id === id; })[0];
+    if (!zeile) return null;
+    ['name', 'text', 'status'].forEach(function (k) {
+      if (werte && werte[k] != null) zeile[k] = String(werte[k]);
+    });
+    zeile.geaendert = zeitstempel_();
+    schreibeZeile_(sheet, BW_EINTRAG, zeile);
+    fensterMelden_([id]);
+    return eintragAusZeile_(zeile);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * Speichert eine Reihenfolge (Zeitstrahl, Pinnwand): ids[0] bekommt 1, ids[1] 2 …
+ * Schreibt die ganze Spalte auf einmal – schneller als Zeile für Zeile.
+ */
+function bwReihenfolgeSetzen(ids, ausFenster) {
+  var lock = LockService.getDocumentLock();
+  lock.waitLock(20000);
+  try {
+    var sheet = blatt_(datenbank_(), BW_EINTRAG);
+    var index = spalten_(sheet, BW_EINTRAG);
+    var n = sheet.getLastRow() - 1;
+    if (n <= 0) return {};
+    var idSpalte = sheet.getRange(2, index.id + 1, n, 1).getValues();
+    var bereich = sheet.getRange(2, index.reihe + 1, n, 1);
+    var werte = bereich.getValues();
+    var neu = {};
+    ids.forEach(function (id, i) { neu[id] = i + 1; });
+    idSpalte.forEach(function (z, i) {
+      if (String(z[0]) in neu) werte[i][0] = neu[String(z[0])];
+    });
+    bereich.setValues(werte);
+    if (ausFenster) fensterMelden_(ids);
+    return neu;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/** Löschen aus dem großen Fenster – die Seitenleiste erfährt es beim nächsten Abgleich. */
+function bwFensterLoeschen(id) {
+  bwLoeschen(id);
+  fensterMelden_([id]);
+  return true;
+}
+
 /** Liest einzelne Einträge neu – für die Seitenleiste, wenn das große Fenster etwas geändert hat. */
 function bwEintraegeLesen(ids) {
   return liesTabelle_(blatt_(datenbank_(), BW_EINTRAG), BW_EINTRAG)
@@ -270,8 +330,14 @@ var BW_CACHE_FENSTER = 'BW_FENSTER_STAND';
 function fensterMelden_(ids, oben) {
   var cache = CacheService.getDocumentCache();
   if (!cache) return;
-  var stand = { zeit: Date.now(), ids: ids };
-  if (oben) stand.oben = oben;
+  // Mehrere Änderungen kurz hintereinander: alle IDs behalten, nicht nur die letzte.
+  // Die Seitenleiste liest damit höchstens ein paar Einträge zu viel neu.
+  var alt = fensterStand_() || {};
+  var alle = (alt.ids || []).filter(function (id) { return ids.indexOf(id) < 0; }).concat(ids).slice(-200);
+  var stand = { zeit: Date.now(), ids: alle };
+  var o = alt.oben || {};
+  Object.keys(oben || {}).forEach(function (k) { o[k] = oben[k]; });
+  if (Object.keys(o).length) stand.oben = o;
   cache.put(BW_CACHE_FENSTER, JSON.stringify(stand), 21600);
 }
 
@@ -528,7 +594,8 @@ function eintragZuZeile_(e) {
     blatt: e.blatt,
     erstellt: e.erstellt,
     geaendert: e.geaendert,
-    ankertext: e.ankertext || ''
+    ankertext: e.ankertext || '',
+    reihe: e.reihe || ''
   };
 }
 
@@ -547,7 +614,8 @@ function eintragAusZeile_(z) {
     blatt: z.blatt,
     erstellt: z.erstellt,
     geaendert: z.geaendert,
-    ankertext: z.ankertext || ''
+    ankertext: z.ankertext || '',
+    reihe: z.reihe || ''
   };
 }
 

@@ -10,9 +10,9 @@ let html = lies('Sidebar.html').replace(/<\?!=\s*include\('(\w+)'\);?\s*\?>/g, (
 const mock = lies('Sprachen.gs') + '\n' + lies('Fragebogen.gs') + '\n' + readFileSync(new URL('./mock.js', import.meta.url), 'utf8');
 html = html.replace('<body>', () => '<body style="width:300px;margin:0 auto;border-left:1px solid #ddd;border-right:1px solid #ddd">\n<script>' + mock + '</script>');
 
-// Das große Fenster (Steckbrief einer Karte): dist/fenster.html#id=p1
+// Das große Fenster: dist/fenster.html#id=p1 (Steckbrief einer Karte), dist/fenster.html#zeit (Zeitstrahl)
 let fenster = lies('Fenster.html').replace(/<\?!=\s*include\('(\w+)'\);?\s*\?>/g, (_, name) => lies(name + '.html'))
-  .replace('<?!= start ?>', () => "{ ansicht: 'steckbrief', start: { id: (location.hash.match(/id=(\\w+)/) || [0, 'p1'])[1] } }");
+  .replace('<?!= start ?>', () => "location.hash === '#zeit' ? { ansicht: 'zeitstrahl', start: {} } : { ansicht: 'steckbrief', start: { id: (location.hash.match(/id=(\\w+)/) || [0, 'p1'])[1] } }");
 fenster = fenster.replace('<body class="fenster">', () => '<body class="fenster">\n<script>' + mock + '\ngoogle.script.host = { close: function () { window.close(); } };</script>');
 
 mkdirSync(new URL('../dist/', import.meta.url), { recursive: true });

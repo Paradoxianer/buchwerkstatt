@@ -144,6 +144,55 @@ function bwKiPruefen(anfrage) {
   return kiAnfrage_(system, prompt, schema, 4000);
 }
 
+/**
+ * Schlägt eine chronologische Reihenfolge für den Zeitstrahl vor – auch bei relativen
+ * Angaben („zwei Tage vor dem Krieg“), die sich nicht ausrechnen lassen.
+ * liste = [{ id, datum, text, abschnitt }] in der jetzigen Reihenfolge.
+ * Antwort = { reihenfolge: [ids], hinweise: [{ id, text }] }
+ */
+function bwKiZeitOrdnen(liste) {
+  var schema = {
+    type: 'object',
+    properties: {
+      reihenfolge: { type: 'array', items: { type: 'integer' } },
+      hinweise: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: { nr: { type: 'integer' }, text: { type: 'string' } },
+          required: ['nr', 'text'],
+          additionalProperties: false
+        }
+      }
+    },
+    required: ['reihenfolge', 'hinweise'],
+    additionalProperties: false
+  };
+  var system = 'You help a novelist put the timeline of their story in chronological order (story time, not chapter order). ' +
+    'Dates may be absolute ("12 March 1914"), relative to other events ("two days before the war broke out") or vague. ' +
+    'Resolve relative dates by finding the event they refer to. Lines marked SECTION are headings for a period; ' +
+    'place each before the events that belong to it. If the current order is already right, keep it. ' +
+    'Return every number exactly once in "reihenfolge". ' +
+    'In "hinweise", briefly explain only moves that are not obvious and events whose position is uncertain (at most five), written in ' + kiSprache_() + '.';
+  var prompt = 'Timeline in its current order:\n' + liste.map(function (z, i) {
+    return (i + 1) + '. ' + (z.abschnitt ? 'SECTION: ' + (z.datum || z.text) : (z.datum || '(no date)') + ' – ' + String(z.text || '').slice(0, 300));
+  }).join('\n');
+  var antwort = kiAnfrage_(system, prompt, schema, 4000);
+  // Nur gültige Nummern, jede einmal; Vergessenes bleibt an seinem Platz hinten dran.
+  var gesehen = {};
+  var reihenfolge = (antwort.reihenfolge || []).filter(function (nr) {
+    if (!(nr >= 1 && nr <= liste.length) || gesehen[nr]) return false;
+    gesehen[nr] = true;
+    return true;
+  });
+  liste.forEach(function (z, i) { if (!gesehen[i + 1]) reihenfolge.push(i + 1); });
+  return {
+    reihenfolge: reihenfolge.map(function (nr) { return liste[nr - 1].id; }),
+    hinweise: (antwort.hinweise || []).filter(function (x) { return liste[x.nr - 1]; })
+      .map(function (x) { return { id: liste[x.nr - 1].id, text: x.text }; })
+  };
+}
+
 function kiAnfrage_(system, prompt, schema, maxTokens) {
   var key = PropertiesService.getUserProperties().getProperty(BW_PROP_KI);
   if (!key) throw new Error(tx_('kiKeinSchluessel'));

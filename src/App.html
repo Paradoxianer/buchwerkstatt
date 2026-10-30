@@ -495,7 +495,7 @@
   }
 
   function ereignisseZu(id) {
-    return (D.graph.rein[id] || []).map(eintrag).filter(function (e) { return e && e.art === 'zeit'; }).sort(nachDatum);
+    return C.zeitReihe((D.graph.rein[id] || []).map(eintrag).filter(function (e) { return e && e.art === 'zeit' && e.status !== 'abschnitt'; }), D.jahr);
   }
 
   /** Karten, die mit dieser verbunden sind – direkt oder weil sie gemeinsam erwähnt werden. */
@@ -723,6 +723,16 @@
     }
     if (e.art === 'notiz') {
       optionen.push({ html: th('menue.pinnwand'), tun: function () { e.art = 'idee'; e.status = 'offen'; speichere(e).then(render); render(); } });
+    }
+    if (e.art === 'zeit' && S.ansicht === 'zeit' && !S.zeitKi) {
+      optionen.push({ html: th('zeit.frueher'), tun: function () { zeitSchritt(id, -1); } });
+      optionen.push({ html: th('zeit.spaeter'), tun: function () { zeitSchritt(id, 1); } });
+      optionen.push({ html: th(e.status === 'abschnitt' ? 'zeit.alsEreignis' : 'zeit.alsAbschnitt'), tun: function () {
+        e.status = e.status === 'abschnitt' ? '' : 'abschnitt';
+        speichere(e).then(render);
+        render();
+      } });
+      optionen.push({ html: '⤢ ' + th('zeit.fenster'), tun: zeitFenster });
     }
     optionen.push({ html: gefahr(t('menue.loeschen')), tun: function () {
       loesche(e, istKarte(e) ? t('loeschen.frage', { name: e.name }) : null);
@@ -1198,6 +1208,19 @@
     })();
   }
 
+  /** Zeitstrahl im großen Fenster – erst wenn alles gespeichert ist, damit das Fenster den neuesten Stand hat. */
+  function zeitFenster() {
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    var knopf = $('[data-aktion="zeit-fenster"]');
+    if (knopf) knopf.disabled = true;
+    var frei = function () { if (knopf) knopf.disabled = false; };
+    (function oeffne() {
+      if (laufend > 0) { setTimeout(oeffne, 150); return; }
+      rufe('bwFensterOeffnen', 'zeitstrahl', {}, t('zeit.fenster.titel'))
+        .then(frei, function (err) { frei(); toast(fehlertext(err), { fehler: true }); });
+    })();
+  }
+
   /** Das große Fenster hat etwas gespeichert: die Steckbriefe dieser Einträge neu holen. */
   function fensterAbgleich(stand) {
     if (!stand || stand.zeit === S.fensterZeit) return;
@@ -1206,19 +1229,28 @@
       S.einst.arten.forEach(function (x) { if (stand.oben[x.id]) x.oben = stand.oben[x.id]; });
       berechne();
     }
-    rufe('bwEintraegeLesen', stand.ids || []).then(function (liste) {
+    var ids = stand.ids || [];
+    rufe('bwEintraegeLesen', ids).then(function (liste) {
+      var gelesen = {};
       liste.forEach(function (neu) {
+        gelesen[neu.id] = true;
         var e = eintrag(neu.id);
-        if (!e) return;
+        if (!e) { S.eintraege.push(neu); berechne(); return; } // im Fenster neu angelegt
         var vorher = verweiseVon(e);
-        e.felder = neu.felder;
-        e.geaendert = neu.geaendert;
+        Object.keys(neu).forEach(function (k) { e[k] = neu[k]; });
         berechne();
         blaetterVormerken(vorher.concat(verweiseVon(e)));
       });
+      // Im Fenster gelöscht
+      var weg = ids.filter(function (id) { return !gelesen[id] && eintrag(id); });
+      if (weg.length) {
+        S.eintraege = S.eintraege.filter(function (x) { return weg.indexOf(x.id) < 0; });
+        berechne();
+      }
+      if (ids.length) D.jahr = C.haeufigstesJahr(S.eintraege.filter(function (e) { return e.art === 'zeit'; }).map(function (e) { return e.name; }));
       var el = document.activeElement;
       var tippt = el && el.matches && el.matches('#ansicht textarea, #ansicht input');
-      if (!tippt && (S.ansicht === 'karte' || S.ansicht === 'welt')) render();
+      if (!tippt && ['karte', 'welt', 'zeit', 'pinnwand', 'notizen'].indexOf(S.ansicht) >= 0) render();
     }, function () {});
   }
 
@@ -1584,17 +1616,40 @@
       (S.bearbeiten === z.id ? bearbeitenHtml(z) : '<div class="notiz-text">' + textHtml(z.text) + '</div>') + '</div></div>';
   }
 
+  /** Ein Zeitabschnitt („Vor dem Krieg“) – eine Überschrift im Zeitstrahl. */
+  function abschnittHtml(z) {
+    if (S.bearbeiten === z.id) return '<div class="notiz">' + bearbeitenHtml(z) + '</div>';
+    return '<div class="abschnitt" data-eintrag="' + h(z.id) + '"><span>' + h(z.name || z.text || '…') + '</span>' +
+      '<button class="mini" data-menue="' + h(z.id) + '" title="' + th('mehr') + '">⋯</button></div>';
+  }
+
+  /** Alle Ereignisse und Abschnitte in ihrer Reihenfolge (oder im Vorschlag der KI). */
+  function zeitAlle() {
+    var alle = C.zeitReihe(S.eintraege.filter(function (e) { return e.art === 'zeit'; }), D.jahr);
+    if (!S.zeitKi) return alle;
+    var nach = {};
+    S.zeitKi.reihenfolge.forEach(function (id, i) { nach[id] = i; });
+    return alle.slice().sort(function (a, b) { return (nach[a.id] != null ? nach[a.id] : 1e9) - (nach[b.id] != null ? nach[b.id] : 1e9); });
+  }
+
   function renderZeit() {
-    var alle = S.eintraege.filter(function (e) { return e.art === 'zeit'; }).sort(nachDatum);
+    var alle = zeitAlle();
+    var ereignisse = alle.filter(function (z) { return z.status !== 'abschnitt'; });
     var personen = {};
-    alle.forEach(function (z) { (D.graph.raus[z.id] || []).forEach(function (id) { personen[id] = true; }); });
+    ereignisse.forEach(function (z) { (D.graph.raus[z.id] || []).forEach(function (id) { personen[id] = true; }); });
     var auswahl = Object.keys(personen).map(eintrag).filter(Boolean).sort(function (a, b) { return a.name.localeCompare(b.name, I.locale()); });
-    var gefiltert = S.zeitMit ? alle.filter(function (z) { return (D.graph.raus[z.id] || []).indexOf(S.zeitMit) >= 0; }) : alle;
+    var gefiltert = S.zeitMit ? alle.filter(function (z) { return z.status === 'abschnitt' || (D.graph.raus[z.id] || []).indexOf(S.zeitMit) >= 0; }) : alle;
     var feld = 'border:1px solid var(--linie);border-radius:6px;padding:5px 7px;outline:0';
     var html = '<div class="eingabe" style="padding:8px;display:flex;gap:6px;flex-wrap:wrap">' +
       '<input id="z-datum" placeholder="' + th('zeit.wann') + '" style="flex:1 1 100px;' + feld + '">' +
       '<input id="z-text" placeholder="' + th('zeit.was') + '" style="flex:2 1 140px;' + feld + '">' +
       '<button class="knopf primaer klein" data-aktion="zeit-neu">＋</button></div>';
+    if (ereignisse.length > 1 || alle.length > ereignisse.length) {
+      html += '<div class="zeit-leiste"><button class="knopf klein" data-aktion="zeit-fenster" title="' + th('zeit.fenster.info') + '">⤢ ' + th('zeit.fenster') + '</button>' +
+        (kiSichtbar() && ereignisse.length > 2 ? '<button class="knopf ki klein" data-aktion="zeit-ki"' + (S.zeitKiLaeuft ? ' disabled' : '') + ' title="' + th('zeit.ki.info') + '">' +
+          (S.zeitKiLaeuft ? th('zeit.ki.laeuft') : th('zeit.ki')) + '</button>' : '') + '</div>';
+    }
+    if (S.zeitKi) html += zeitKiHtml(alle);
     if (auswahl.length) {
       html += '<div class="filter"><button class="chip' + (S.zeitMit ? '' : ' aktiv') + '" data-zeitmit="">' + th('filter.alle') + '</button>' +
         auswahl.map(function (k) {
@@ -1604,7 +1659,66 @@
     if (!gefiltert.length) {
       return html + '<div class="leer"><div class="gross">📅</div>' + th('zeit.leer') + '<br>' + th('zeit.tipp') + ' <b>' + th('zeit.beispiel', { wort: erstesWort('zeit') }) + '</b></div>';
     }
-    return html + '<div class="zeitstrahl" style="margin-top:10px">' + gefiltert.map(ereignisHtml).join('') + '</div>';
+    var hinweise = {};
+    if (S.zeitKi) S.zeitKi.hinweise.forEach(function (x) { hinweise[x.id] = x.text; });
+    // Beim KI-Vorschlag wird nicht gezogen – erst übernehmen oder verwerfen.
+    var ziehbar = !S.zeitKi;
+    return html + '<div class="zeitstrahl ziehliste" data-liste="zeit" style="margin-top:10px">' + gefiltert.map(function (z) {
+      var inhalt = z.status === 'abschnitt' ? abschnittHtml(z) : ereignisHtml(z);
+      var neu = S.zeitKi && S.zeitKi.vorher[z.id] !== S.zeitKi.reihenfolge.indexOf(z.id);
+      return '<div class="zieh' + (neu ? ' verschoben' : '') + '"' + (ziehbar && S.bearbeiten !== z.id ? ' draggable="true"' : '') + ' data-zieh="' + h(z.id) + '">' +
+        (ziehbar ? '<span class="griff" title="' + th('zeit.ziehen') + '">⠿</span>' : '') + inhalt +
+        (hinweise[z.id] ? '<div class="ki-hinweis">✨ ' + h(hinweise[z.id]) + '</div>' : '') + '</div>';
+    }).join('') + '</div>' +
+      (ziehbar && ereignisse.length > 1 && !S.zeitTippGesehen ? '<div class="unter" style="margin-top:8px">' + th('zeit.ordnenTipp') + '</div>' : '');
+  }
+
+  function zeitKiHtml(alle) {
+    var n = alle.filter(function (z) { return S.zeitKi.vorher[z.id] !== S.zeitKi.reihenfolge.indexOf(z.id); }).length;
+    return '<div class="vorschlag-box" style="margin-top:8px"><h4>' + th('ki.vorschlag') + '</h4>' +
+      '<div class="unter" style="margin:0 0 6px">' + (n ? th('zeit.ki.verschoben', { n: n }) : th('zeit.ki.passt')) + '</div><div class="ki-leiste">' +
+      (n ? '<button class="knopf primaer klein" data-aktion="zeit-ki-ja">' + th('ki.uebernehmen') + '</button>' : '') +
+      '<button class="knopf klein" data-aktion="zeit-ki-nein">' + th(n ? 'ki.verwerfen' : 'schliessen') + '</button></div></div>';
+  }
+
+  function zeitKiFragen() {
+    var alle = C.zeitReihe(S.eintraege.filter(function (e) { return e.art === 'zeit' && !e.provisorisch; }), D.jahr);
+    S.zeitKiLaeuft = true;
+    render();
+    rufe('bwKiZeitOrdnen', alle.map(function (z) { return { id: z.id, datum: z.name, text: z.text, abschnitt: z.status === 'abschnitt' }; }))
+      .then(function (v) {
+        S.zeitKiLaeuft = false;
+        var vorher = {};
+        alle.forEach(function (z, i) { vorher[z.id] = i; });
+        S.zeitKi = { reihenfolge: v.reihenfolge, hinweise: v.hinweise || [], vorher: vorher };
+        S.zeitMit = null;
+        render();
+      }, function (err) {
+        S.zeitKiLaeuft = false;
+        render();
+        toast(fehlertext(err), { fehler: true });
+      });
+  }
+
+  /** Neue Reihenfolge merken: Positionen lokal setzen und alle auf einmal speichern. */
+  function reihenfolgeSpeichern(ids) {
+    ids.forEach(function (id, i) { var e = eintrag(id); if (e) e.reihe = String(i + 1); });
+    render();
+    return sichere('bwReihenfolgeSetzen', ids.filter(function (id) { return id.indexOf('tmp') !== 0; }));
+  }
+
+  /** Ereignis im Zeitstrahl verschieben: vor/hinter ein anderes oder einen Schritt (richtung ±1). */
+  function zeitVerschieben(id, zielId, danach) {
+    var ids = C.zeitReihe(S.eintraege.filter(function (e) { return e.art === 'zeit'; }), D.jahr).map(function (z) { return z.id; });
+    S.zeitTippGesehen = true;
+    reihenfolgeSpeichern(C.verschiebe(ids, id, zielId, danach));
+  }
+
+  function zeitSchritt(id, richtung) {
+    // Im gefilterten Zeitstrahl: am nächsten sichtbaren Nachbarn vorbei.
+    var sichtbar = $$('[data-liste="zeit"] [data-zieh]').map(function (x) { return x.dataset.zieh; });
+    var i = sichtbar.indexOf(id), ziel = sichtbar[i + richtung];
+    if (ziel) zeitVerschieben(id, ziel, richtung > 0);
   }
 
   /* -------------------------------------------------------------- */
@@ -1612,8 +1726,7 @@
   /* -------------------------------------------------------------- */
 
   function renderPinnwand() {
-    var ideen = S.eintraege.filter(function (e) { return e.art === 'idee'; })
-      .sort(function (a, b) { return String(b.erstellt).localeCompare(String(a.erstellt)); });
+    var ideen = ideenReihe(S.eintraege.filter(function (e) { return e.art === 'idee'; }));
     var html = '<div class="eingabe" style="padding:8px;display:flex;gap:6px">' +
       '<input id="idee-text" placeholder="' + th('idee.neu') + '" style="flex:1;border:0;outline:0;padding:4px">' +
       '<button class="knopf primaer klein" data-aktion="idee-neu">＋</button></div>';
@@ -1624,10 +1737,97 @@
     ].forEach(function (s) {
       var liste = ideen.filter(function (e) { return (e.status || 'offen') === s.id; });
       if (!liste.length && !s.leer) return;
-      html += '<div class="spalte"><div class="gruppe-kopf" style="margin-top:12px">' + th('idee.' + s.id) + ' <span class="zahl">' + liste.length + '</span></div>' +
-        (liste.length ? liste.map(ideeHtml).join('') : '<div class="unter">' + h(s.leer) + '</div>') + '</div>';
+      html += '<div class="spalte ziehliste" data-liste="idee:' + s.id + '"><div class="gruppe-kopf" style="margin-top:12px">' + th('idee.' + s.id) + ' <span class="zahl">' + liste.length + '</span></div>' +
+        (liste.length ? liste.map(function (e) {
+          return '<div class="zieh"' + (S.bearbeiten === e.id ? '' : ' draggable="true"') + ' data-zieh="' + h(e.id) + '"><span class="griff" title="' + th('idee.ziehen') + '">⠿</span>' + ideeHtml(e) + '</div>';
+        }).join('') : '<div class="unter">' + h(s.leer) + '</div>') + '</div>';
     });
     return html;
+  }
+
+  /** Von Hand geordnete Ideen in ihrer Reihenfolge; neue (noch ohne Position) obenauf, neueste zuerst. */
+  function ideenReihe(liste) {
+    var ohne = liste.filter(function (e) { return C.reihe(e) == null; })
+      .sort(function (a, b) { return String(b.erstellt).localeCompare(String(a.erstellt)); });
+    var mit = liste.filter(function (e) { return C.reihe(e) != null; })
+      .sort(function (a, b) { return C.reihe(a) - C.reihe(b); });
+    return ohne.concat(mit);
+  }
+
+  /** Idee in eine Spalte ziehen: Reihenfolge darin speichern, bei anderer Spalte auch den Status. */
+  function ideeAblegen(id, status, zielId, danach) {
+    var e = eintrag(id);
+    if (!e) return;
+    var ids = ideenReihe(S.eintraege.filter(function (x) { return x.art === 'idee' && (x.status || 'offen') === status && x !== e; }))
+      .map(function (x) { return x.id; });
+    var i = zielId ? ids.indexOf(zielId) : -1;
+    ids.splice(i < 0 ? ids.length : (danach ? i + 1 : i), 0, id);
+    var neuerStatus = (e.status || 'offen') !== status;
+    reihenfolgeSpeichern(ids);
+    if (neuerStatus) {
+      e.status = status;
+      speichere(e).then(render);
+      render();
+    }
+  }
+
+  /* Ziehen & Ablegen: Zeitstrahl und Pinnwand */
+
+  var zieh = null;
+
+  function ziehStart(ev) {
+    var el = ev.target.closest && ev.target.closest('[data-zieh]');
+    if (!el || !el.draggable) return;
+    zieh = { id: el.dataset.zieh, liste: el.closest('[data-liste]').dataset.liste };
+    ev.dataTransfer.effectAllowed = 'move';
+    ev.dataTransfer.setData('text/plain', zieh.id);
+    setTimeout(function () { el.classList.add('zieht'); }, 0);
+  }
+
+  /** Wohin würde abgelegt? { liste, zielId, danach } – oder null. */
+  function ziehZiel(ev) {
+    var liste = ev.target.closest && ev.target.closest('[data-liste]');
+    if (!zieh || !liste) return null;
+    var name = liste.dataset.liste;
+    if (name.split(':')[0] !== zieh.liste.split(':')[0]) return null;
+    var el = ev.target.closest('[data-zieh]');
+    if (!el || el.dataset.zieh === zieh.id) return { liste: name, el: el, zielId: null, danach: true };
+    var r = el.getBoundingClientRect();
+    return { liste: name, el: el, zielId: el.dataset.zieh, danach: ev.clientY > r.top + r.height / 2 };
+  }
+
+  function ziehMarkierungWeg() {
+    $$('.ziel-vor, .ziel-nach, .ziel-ende').forEach(function (x) { x.classList.remove('ziel-vor', 'ziel-nach', 'ziel-ende'); });
+  }
+
+  function ziehUeber(ev) {
+    var z = ziehZiel(ev);
+    if (!z) return;
+    ev.preventDefault();
+    ev.dataTransfer.dropEffect = 'move';
+    ziehMarkierungWeg();
+    if (z.zielId) z.el.classList.add(z.danach ? 'ziel-nach' : 'ziel-vor');
+    else if (!z.el) $('[data-liste="' + z.liste + '"]').classList.add('ziel-ende');
+  }
+
+  function ziehAblegen(ev) {
+    var z = ziehZiel(ev);
+    ziehMarkierungWeg();
+    if (!z) return;
+    ev.preventDefault();
+    var id = zieh.id;
+    zieh = null;
+    if (z.liste === 'zeit') {
+      if (z.zielId) zeitVerschieben(id, z.zielId, z.danach);
+    } else if (z.zielId || !z.el) {
+      ideeAblegen(id, z.liste.split(':')[1], z.zielId, z.danach);
+    }
+  }
+
+  function ziehEnde() {
+    zieh = null;
+    ziehMarkierungWeg();
+    $$('.zieht').forEach(function (x) { x.classList.remove('zieht'); });
   }
 
   function ideeHtml(e) {
@@ -1980,6 +2180,14 @@
     },
     'bearbeiten-ok': function (b) { bearbeitenFertig(b.dataset.id); },
     'bearbeiten-abbruch': function () { S.bearbeiten = null; render(); },
+    'zeit-fenster': zeitFenster,
+    'zeit-ki': zeitKiFragen,
+    'zeit-ki-ja': function () {
+      var ids = S.zeitKi.reihenfolge;
+      S.zeitKi = null;
+      reihenfolgeSpeichern(ids).then(function () { toast(t('zeit.ki.uebernommen')); });
+    },
+    'zeit-ki-nein': function () { S.zeitKi = null; render(); },
     'zeit-neu': function () {
       var d = $('#z-datum').value.trim(), x = $('#z-text').value.trim();
       if (!d && !x) return;
@@ -2169,6 +2377,10 @@
     document.addEventListener('click', klick);
     document.addEventListener('change', aenderung);
     document.addEventListener('keydown', tasten);
+    document.addEventListener('dragstart', ziehStart);
+    document.addEventListener('dragover', ziehUeber);
+    document.addEventListener('drop', ziehAblegen);
+    document.addEventListener('dragend', ziehEnde);
     // Auf- und zugeklappte Bereiche im Steckbrief merken (toggle steigt nicht auf, daher capture).
     document.addEventListener('toggle', function (ev) {
       var d = ev.target;
