@@ -69,7 +69,7 @@
     if (laufend > 0) {
       el.textContent = t('status.speichert');
     } else if (S.stat && S.einst) {
-      var ziel = S.einst.tagesziel || 0;
+      var ziel = tagesziel();
       el.textContent = ziel
         ? t('status.woerter', { n: I.zahl(S.stat.heute), ziel: I.zahl(ziel) })
         : t('status.woerterOhneZiel', { n: I.zahl(S.stat.heute) });
@@ -217,11 +217,13 @@
       opt.beiEnde = null;
       el.hidden = true;
     };
+    // Fehler bleiben stehen, bis man sie wegklickt – sonst sind sie weg, bevor man sie lesen kann.
+    if (opt.fehler && !opt.dauer) return;
     toastTimer = setTimeout(function () {
       el.hidden = true;
       if (opt.beiEnde) opt.beiEnde();
       opt.beiEnde = null;
-    }, opt.dauer || (opt.fehler ? 7000 : 4000));
+    }, opt.dauer || 4000);
   }
 
   /** optionen: [{ html, tun }] – html ist bereits maskiert. */
@@ -1065,11 +1067,20 @@
     if (S.kiVorschlag && S.kiVorschlag.id === e.id) html += kiVorschlagHtml(e);
     if (S.kiBefunde && S.kiBefunde.id === e.id) html += kiBefundeHtml();
 
-    // Steckbrief – in Bereichen zum Aufklappen, wenn die Art welche hat
+    // Steckbrief – oben die Felder mit Stern, darunter die Bereiche zum Aufklappen
     var gruppen = C.steckbrief(a.felder, e.felder, t('karte.weitere'));
     if (gruppen.length) {
+      var oben = sternFelder(a, e), istOben = {};
+      oben.forEach(function (n) { istOben[n] = true; });
+      var obenListe = [];
+      gruppen.forEach(function (g) { g.felder.forEach(function (f) { if (istOben[f.name]) obenListe.push(f); }); });
+      var rest = gruppen.map(function (g) {
+        return Object.assign({}, g, { felder: g.felder.filter(function (f) { return !istOben[f.name]; }) });
+      }).filter(function (g) { return g.felder.length; });
       html += '<div class="block"><div class="block-titel">' + th('karte.steckbrief') + '</div>' +
-        gruppen.map(function (g) { return steckbriefGruppe(e, g); }).join('') +
+        (obenListe.length ? steckbriefFelder(e, obenListe, true) : '') +
+        rest.map(function (g) { return steckbriefGruppe(e, g); }).join('') +
+        (rest.some(function (g) { return g.titel; }) ? '<div class="unter stern-hinweis">' + th('karte.stern.hinweis') + '</div>' : '') +
         '<div class="ki-leiste"><button class="knopf klein" data-aktion="steckbrief-fenster" title="' + th('karte.ausfuehrlich.titel') + '">' + th('karte.ausfuehrlich') + '</button></div></div>';
     }
 
@@ -1130,9 +1141,19 @@
     return html;
   }
 
-  function steckbriefFelder(e, felder) {
-    return '<div class="felder">' + felder.map(function (f) {
-      return '<label title="' + h(f.frage) + '">' + h(f.name) + '</label><textarea data-auto rows="1" data-steckbrief="' + h(f.name) + '" placeholder="' + h(f.frage || '–') + '" title="' + h(f.frage) + '">' + h((e.felder || {})[f.name] || '') + '</textarea>';
+  /** Felder mit Stern für diese Karte (siehe BWCore.obenFelder). */
+  function sternFelder(a, e) {
+    return C.obenFelder(a, (S.kurzeArten[I.sprache()] || {})[a.id], e && e.felder);
+  }
+
+  function sternKnopf(name, an) {
+    return '<button class="stern' + (an ? ' an' : '') + '" data-aktion="stern" data-name="' + h(name) + '" title="' +
+      th(an ? 'karte.stern.weg' : 'karte.stern.dazu') + '">' + (an ? '★' : '☆') + '</button>';
+  }
+
+  function steckbriefFelder(e, felder, oben) {
+    return '<div class="felder' + (oben ? ' oben' : '') + '">' + felder.map(function (f) {
+      return '<label title="' + h(f.frage) + '">' + sternKnopf(f.name, oben) + h(f.name) + '</label><textarea data-auto rows="1" data-steckbrief="' + h(f.name) + '" placeholder="' + h(f.frage || '–') + '" title="' + h(f.frage) + '">' + h((e.felder || {})[f.name] || '') + '</textarea>';
     }).join('') + '</div>';
   }
 
@@ -1174,7 +1195,11 @@
   function fensterAbgleich(stand) {
     if (!stand || stand.zeit === S.fensterZeit) return;
     S.fensterZeit = stand.zeit;
-    rufe('bwEintraegeLesen', stand.ids).then(function (liste) {
+    if (stand.oben) {
+      S.einst.arten.forEach(function (x) { if (stand.oben[x.id]) x.oben = stand.oben[x.id]; });
+      berechne();
+    }
+    rufe('bwEintraegeLesen', stand.ids || []).then(function (liste) {
       liste.forEach(function (neu) {
         var e = eintrag(neu.id);
         if (!e) return;
@@ -1485,9 +1510,39 @@
     }
   }
 
+  function heuteIso() {
+    var d = new Date();
+    return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+  }
+
+  /** Mit Buchziel und Zieldatum: der Plan (sonst null). */
+  function schreibplan() {
+    if (!S.stat || !S.einst) return null;
+    return C.schreibplan({
+      gesamtziel: S.einst.gesamtziel, zieldatum: S.einst.zieldatum, schreibtage: S.einst.schreibtage,
+      heute: heuteIso(), woerterMorgen: S.stat.gesamt - S.stat.heute
+    });
+  }
+
+  /** Das Tagesziel für heute – ausgerechnet, wenn es einen Plan gibt, sonst das eingetragene. */
+  function tagesziel() {
+    var p = schreibplan();
+    if (p && !p.vorbei && !p.fertig) return p.heuteSchreibtag ? p.proTag : 0;
+    return Number(S.einst.tagesziel) || 0;
+  }
+
+  function datumLang(iso) {
+    try {
+      return new Date(iso + 'T12:00:00').toLocaleDateString(I.locale(), { day: 'numeric', month: 'long', year: 'numeric' });
+    } catch (err) {
+      return iso;
+    }
+  }
+
   function renderZiel() {
-    var s = S.stat, ziel = Number(S.einst.tagesziel) || 0, gesamtziel = Number(S.einst.gesamtziel) || 0;
+    var s = S.stat, ziel = tagesziel(), gesamtziel = Number(S.einst.gesamtziel) || 0;
     if (!s) return '<div class="laden"><div class="kreisel"></div>' + th('ziel.zaehlt') + '</div>';
+    var plan = schreibplan(), planAktiv = plan && !plan.vorbei && !plan.fertig;
     var anteil = ziel ? Math.min(1, s.heute / ziel) : 0;
     var u = 2 * Math.PI * 38;
     var ring = '<svg class="ring" viewBox="0 0 92 92"><circle cx="46" cy="46" r="38" fill="none" stroke="#e8eaed" stroke-width="9"/>' +
@@ -1503,7 +1558,8 @@
     var html = '<div class="block"><div class="block-titel">' + th('ziel.heute') + '</div><div class="ring-box">' + ring + '<div>' +
       '<div class="zahl-gross">' + I.zahl(s.heute) + '</div><div class="unter" style="margin:0">' + th('ziel.von', { n: I.zahl(ziel) }) + '</div>' +
       (anteil >= 1 ? '<div style="margin-top:4px">' + th('ziel.geschafft') + '</div>' : ziel ? '<div style="margin-top:4px;color:var(--text-2)">' + th('ziel.noch', { n: I.zahl(ziel - s.heute) }) + '</div>' : '') +
-      (serie > 1 ? '<div style="margin-top:2px">' + th('ziel.serie', { n: serie }) + '</div>' : '') + '</div></div></div>';
+      (serie > 1 ? '<div style="margin-top:2px">' + th('ziel.serie', { n: serie }) + '</div>' : '') + '</div></div>' +
+      (planAktiv && !plan.heuteSchreibtag ? '<div class="unter">' + th('ziel.freiTag') + '</div>' : '') + '</div>';
     html += '<div class="block"><div class="block-titel">' + th('ziel.letzte') + '<span class="rechts"><button class="link" data-aktion="statistik">↻</button></span></div><div class="balken">' +
       tage.map(function (x, j) {
         return '<div class="' + (ziel && x.geschrieben >= ziel ? 'erreicht' : '') + (j === tage.length - 1 ? ' heute' : '') + '" style="height:' + Math.max(2, x.geschrieben / max * 100) + '%" title="' + th('ziel.tag', { datum: datumKurz(x.datum), n: I.zahl(x.geschrieben) }) + '"></div>';
@@ -1511,10 +1567,25 @@
     html += '<div class="block"><div class="block-titel">' + th('ziel.manuskript') + '</div><div class="zahl-gross">' + I.zahl(s.gesamt) + ' <span style="font-size:13px;font-weight:400;color:var(--text-2)">' + th('ziel.woerter') + '</span></div>' +
       '<div class="unter" style="margin:0">' + th('ziel.seiten', { n: I.zahl(Math.round(s.gesamt / 250)) }) + '</div>' +
       (gesamtziel ? '<div class="fortschritt"><div style="width:' + Math.min(100, s.gesamt / gesamtziel * 100) + '%"></div></div><div class="unter">' + th('ziel.anteil', { p: Math.round(s.gesamt / gesamtziel * 100), n: I.zahl(gesamtziel) }) + '</div>' : '') + '</div>';
+    var schreibtage = S.einst.schreibtage || [];
+    // Montag zuerst; die Namen kommen aus der Sprache des Browsers/der Leiste.
+    var wochentage = [1, 2, 3, 4, 5, 6, 0].map(function (n) {
+      var name = new Date(Date.UTC(2026, 10, 1 + n)).toLocaleDateString(I.locale(), { weekday: 'short', timeZone: 'UTC' });
+      return '<button class="tag-knopf' + (schreibtage.indexOf(n) >= 0 ? ' an' : '') + '" data-aktion="schreibtag" data-tag="' + n + '">' + h(name.replace(/\.$/, '')) + '</button>';
+    }).join('');
+    var planText = !plan ? th('ziel.planInfo')
+      : plan.fertig ? th('ziel.buchFertig')
+      : plan.vorbei ? th('ziel.vorbei')
+      : th('ziel.plan', { n: I.zahl(plan.rest), tage: plan.tage, datum: datumLang(S.einst.zieldatum), pro: I.zahl(plan.proTag) });
     html += '<div class="block"><div class="block-titel">' + th('ziel.ziele') + '</div><div class="zielfelder">' +
-      '<label for="z-tag">' + th('ziel.proTag') + '</label><input id="z-tag" type="number" min="0" step="50" data-ziel="tagesziel" value="' + ziel + '">' +
       '<label for="z-ges">' + th('ziel.buch') + '</label><input id="z-ges" type="number" min="0" step="1000" data-ziel="gesamtziel" value="' + (gesamtziel || '') + '" placeholder="' + th('ziel.bsp') + '">' +
-      '</div></div>';
+      '<label for="z-datum">' + th('ziel.datum') + '</label><input id="z-datum" type="date" data-ziel="zieldatum" value="' + h(S.einst.zieldatum || '') + '" min="' + heuteIso() + '">' +
+      '</div><div class="einst-zeile"><label>' + th('ziel.tage') + '</label><div class="tage-wahl">' + wochentage + '</div></div>' +
+      '<div class="zielfelder" style="margin-top:8px"><label for="z-tag">' + th('ziel.proTag') + '</label>' +
+      (planAktiv
+        ? '<span class="ausgerechnet" title="' + th('ziel.automatisch.titel') + '">' + I.zahl(plan.proTag) + '</span>'
+        : '<input id="z-tag" type="number" min="0" step="50" data-ziel="tagesziel" value="' + (Number(S.einst.tagesziel) || 0) + '">') +
+      '</div><div class="unter">' + planText + '</div></div>';
     return html;
   }
 
@@ -1559,15 +1630,18 @@
     html += '<div class="block"><div class="block-titel">' + th('einst.ki') + '</div>' +
       '<div class="unter" style="margin-top:0">' + th('einst.ki.ohne') + '</div>' +
       (S.ki.aktiv
-        ? '<div style="margin-top:6px">' + th('einst.ki.aktiv', { ende: S.ki.ende }) + '</div>' +
+        ? '<div style="margin-top:6px">' + th('einst.ki.aktiv', { ende: S.ki.ende, anbieter: S.ki.anbieter === 'google' ? 'Gemini (Google)' : 'Claude (Anthropic)' }) + '</div>' +
           schalter('kiAnzeigen', t('einst.ki.anzeigen'), t('einst.ki.anzeigen.info')) +
-          '<div class="einst-zeile"><label>' + th('einst.ki.modell') + '</label><select id="ki-modell">' +
-          [['claude-opus-5-5', 'einst.ki.opus'], ['claude-sonnet-5-5', 'einst.ki.sonnet'], ['claude-haiku-5-5', 'einst.ki.haiku']]
-            .map(function (m) { return '<option value="' + m[0] + '"' + (e.kiModell === m[0] ? ' selected' : '') + '>' + th(m[1]) + '</option>'; }).join('') +
-          '</select></div>' +
+          (S.ki.anbieter === 'google'
+            ? '<div class="unter">' + th('einst.ki.google') + '</div>'
+            : '<div class="einst-zeile"><label>' + th('einst.ki.modell') + '</label><select id="ki-modell">' +
+              [['claude-opus-5-5', 'einst.ki.opus'], ['claude-sonnet-5-5', 'einst.ki.sonnet'], ['claude-haiku-5-5', 'einst.ki.haiku']]
+                .map(function (m) { return '<option value="' + m[0] + '"' + (e.kiModell === m[0] ? ' selected' : '') + '>' + th(m[1]) + '</option>'; }).join('') +
+              '</select></div>') +
           '<div class="ki-leiste"><button class="knopf klein gefahr" data-aktion="ki-weg">' + th('einst.ki.weg') + '</button></div>'
-        : '<div class="unter">' + th('einst.ki.info') + ' <a href="https://console.anthropic.com/settings/keys" target="_blank">' + th('einst.ki.link') + '</a></div>' +
-          '<div class="einst-zeile"><input id="ki-key" type="password" placeholder="sk-ant-…" autocomplete="off"></div><div class="ki-leiste"><button class="knopf primaer klein" data-aktion="ki-key">' + th('speichern') + '</button></div>') +
+        : '<div class="unter">' + th('einst.ki.info') + '<br><a href="https://aistudio.google.com/apikey" target="_blank">' + th('einst.ki.linkGoogle') + '</a> · ' +
+          '<a href="https://console.anthropic.com/settings/keys" target="_blank">' + th('einst.ki.link') + '</a></div>' +
+          '<div class="einst-zeile"><input id="ki-key" type="password" placeholder="AIza…  /  sk-ant-…" autocomplete="off"></div><div class="ki-leiste"><button class="knopf primaer klein" data-aktion="ki-key">' + th('speichern') + '</button></div>') +
       '<div class="unter">' + th('einst.ki.privat') + '</div></div>';
 
     html += '<div class="block"><div class="block-titel">' + th('einst.hilfe') + '</div><button class="knopf klein" data-aktion="hilfe-an">' + th('einst.hilfeAn') + '</button></div>';
@@ -1721,6 +1795,7 @@
       var e = eintrag(S.karteId);
       var r = b.getBoundingClientRect();
       var optionen = [{ html: th('karte.menue.notiz', { name: e.name }), tun: AKTIONEN['notiz-zu'] }];
+      if ((art(e.art).felder || []).length) optionen.push({ html: th('karte.ausfuehrlich'), tun: steckbriefFenster });
       if (e.blatt) optionen.push({ html: th('karte.menue.blattAuf'), tun: function () { window.open('https://docs.google.com/document/d/' + e.blatt + '/edit', '_blank'); } });
       else optionen.push({ html: th('karte.menue.blattNeu'), tun: function () { S.blaetterOffen[e.id] = true; blaetterSenden().then(function () { toast(t('karte.menue.blattFertig')); }); } });
       if (e.anker) optionen.push({ html: th('karte.menue.wo'), tun: function () { springe(e); } });
@@ -1774,6 +1849,26 @@
       if (d) d.open = true;
     },
     'steckbrief-fenster': steckbriefFenster,
+    'schreibtag': function (b) {
+      var n = Number(b.dataset.tag), tage = (S.einst.schreibtage || []).slice();
+      tage = tage.indexOf(n) >= 0 ? tage.filter(function (x) { return x !== n; }) : tage.concat([n]);
+      if (!tage.length) return; // mindestens ein Schreibtag
+      S.einst.schreibtage = tage;
+      speichereEinstellungen().then(zeigeStatus);
+      render();
+    },
+    'stern': function (b) {
+      var e = eintrag(S.karteId), a = e && art(e.art);
+      if (!a) return;
+      var name = b.dataset.name, liste = sternFelder(a, e);
+      var an = liste.indexOf(name) < 0;
+      liste = an ? liste.concat([name]) : liste.filter(function (n) { return n !== name; });
+      // Die Einstellungen sind eine Kopie – die Art dort ändern, nicht nur die berechnete.
+      S.einst.arten.forEach(function (x) { if (x.id === a.id) x.oben = liste; });
+      speichereEinstellungen();
+      render();
+      toast(t(an ? 'karte.stern.gesetzt' : 'karte.stern.entfernt', { feld: name, art: a.mehrzahl || a.name }));
+    },
     'art-loeschen': function (b) {
       var a = S.einst.arten[Number(b.dataset.i)];
       if (S.eintraege.some(function (e) { return e.art === a.id; })) { toast(t('einst.art.belegt')); return; }
@@ -1849,7 +1944,7 @@
     }
     if (z.dataset.artFeld) { artFeldGeaendert(z); return; }
     if (z.dataset.ziel) {
-      S.einst[z.dataset.ziel] = Math.max(0, Number(z.value) || 0);
+      S.einst[z.dataset.ziel] = z.dataset.ziel === 'zieldatum' ? z.value : Math.max(0, Number(z.value) || 0);
       speichereEinstellungen().then(function () { zeigeStatus(); if (S.ansicht === 'ziel') render(); });
       return;
     }

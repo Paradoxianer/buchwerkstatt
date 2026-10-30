@@ -42,7 +42,7 @@ DEINE DATEN BLEIBEN BEI DIR
 Alles liegt in deinem eigenen Google Drive, in einer Tabelle und einem Ordner neben dem Manuskript. Die Buchwerkstatt sieht nur Dateien, die sie selbst angelegt hat. Kein Server, keine Werbung, keine Auswertung.
 
 OPTIONALE KI-HILFE
-Wer möchte, lässt Claude (Anthropic) mit einem eigenen API-Schlüssel den Steckbrief ausfüllen oder Widersprüche suchen. Die Buchwerkstatt funktioniert vollständig ohne KI.
+Wer möchte, lässt Gemini (Google) oder Claude (Anthropic) mit einem eigenen API-Schlüssel den Steckbrief ausfüllen oder Widersprüche suchen. Die Buchwerkstatt funktioniert vollständig ohne KI.
 
 ---
 
@@ -80,7 +80,7 @@ YOUR DATA STAYS YOURS
 Everything is stored in your own Google Drive, in a sheet and a folder next to your manuscript. Buchwerkstatt only sees files it created itself. No server, no ads, no tracking.
 
 OPTIONAL AI HELP
-If you like, Claude (Anthropic) can fill in profiles or look for contradictions using your own API key. Buchwerkstatt works fully without AI.
+If you like, Gemini (Google) or Claude (Anthropic) can fill in profiles or look for contradictions using your own API key. Buchwerkstatt works fully without AI.
 
 ---
 

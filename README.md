@@ -37,7 +37,8 @@ Die Grundidee: **Es gibt nur einen Notizblock.** Das erste Wort einer Notiz ents
 - **👥 Welt:** Alle Figuren, Orte und Gegenstände mit Steckbrief, Beschreibung, Beziehungen („Tochter von“) und automatischen Verbindungen. Eigene Arten (z. B. „Organisation“) lassen sich mit eigenen Feldern anlegen.
 - **🗂️ Ausführlicher Steckbrief:** Personen haben einen Fragebogen mit acht Bereichen (Grunddaten, Aussehen, Familie, Beziehungen, Arbeit & Alltag, Innenleben, Auftreten, In der Geschichte). Jedes Feld hat eine Leitfrage, damit man jeden Bereich wirklich durchdenkt. Orte und Gegenstände haben kleinere Fragebögen.
   - In der Seitenleiste lassen sich die Bereiche aufklappen; daneben steht, wie viel schon ausgefüllt ist.
-  - **✎ Ausführlich** öffnet ein großes Fenster: links die Bereiche mit Fortschritt, rechts die Fragen mit viel Platz. Das Manuskript bleibt dabei bedienbar.
+  - **★ Stern:** Felder mit Stern stehen auf der Karte ganz oben, ohne Aufklappen. Mit ☆ neben einem Feld kommt es dazu, mit ★ wieder weg – das gilt für alle Karten derselben Art. Voreingestellt sind die wichtigsten Felder (Alter, Aussehen, Beruf …).
+  - **⤢ Im großen Fenster öffnen** öffnet ein großes Fenster: links die Bereiche mit Fortschritt, rechts die Fragen mit viel Platz. Das Manuskript bleibt dabei bedienbar.
   - Mit KI schlägt **✨ Aus den Notizen vorschlagen** Antworten für den gerade offenen Bereich vor.
   - Unter **⚙️ Mehr → Schlüsselwörter & Felder** lässt sich zwischen ausführlichem Fragebogen und kurzer Liste wechseln oder alles selbst schreiben: `# Familie` beginnt einen Bereich, `Eltern | Wer sind die Eltern?` gibt dem Feld eine Leitfrage.
 - **📅 Zeitstrahl:** Ereignisse nach Datum im Buch sortiert, filterbar nach Figur. Erkannt werden z. B. „12. März“, „3.4.1987“ und „Tag 5“.
@@ -46,7 +47,7 @@ Die Grundidee: **Es gibt nur einen Notizblock.** Das erste Wort einer Notiz ents
 - **📄 Personenblätter fürs Handy:** Zu jeder Karte entsteht automatisch ein kleines Google Doc im Ordner „*Buchtitel* – Welt“. Damit funktioniert in Google Docs **`@Lena`** als Verweis (Smart Chip), auch in der **Docs-App am iPhone**. Die Blätter sind untereinander verlinkt.
 - **🖍️ Namen im Text markieren:** Färbt alle Namen im Manuskript ein. Ein Klick entfernt die Markierungen wieder.
 - **🌐 Mehrsprachig:** Deutsch, Englisch, Französisch, Spanisch, Italienisch, Portugiesisch und Niederländisch. Übersetzt sind Oberfläche, Schlüsselwörter (`Personnage …`, `Personaje …`, `Quand …`), Steckbrief-Felder, Tabelle, Menü, Personenblätter und die Antworten der KI. Der Zeitstrahl versteht Datumsangaben in allen diesen Sprachen („12 de marzo de 1987“, „1er avril“, „14h30“, „March 12th“). Die Sprache wird automatisch aus dem Google-Konto übernommen oder unter **⚙️ Mehr → Sprache** gewählt.
-- **✨ KI-Hilfe (rein optional, mit Claude):** Die Buchwerkstatt funktioniert **vollständig ohne KI**. Ohne API-Schlüssel taucht die KI nirgends auf, und mit Schlüssel lässt sie sich jederzeit wieder ausblenden.
+- **✨ KI-Hilfe (rein optional, mit Gemini oder Claude):** Die Buchwerkstatt funktioniert **vollständig ohne KI**. Ohne API-Schlüssel taucht die KI nirgends auf, und mit Schlüssel lässt sie sich jederzeit wieder ausblenden.
   - *Steckbrief ausfüllen*: Die KI liest Beschreibung und alle Notizen zur Karte und schlägt Felder, weitere Namen und Beziehungen vor. Übernommen wird nur, was angehakt ist.
   - *Widersprüche prüfen*: Findet z. B. „grüne Augen“ in Kapitel 3 und „braune Augen“ in Kapitel 17.
 
@@ -105,10 +106,12 @@ Wer die Seitenleiste benutzt, muss die Berechtigungen **selbst** bestätigen. Al
 
 ### KI-Hilfe einschalten (optional)
 
-1. Auf <https://console.anthropic.com/settings/keys> einen API-Schlüssel erstellen und etwas Guthaben aufladen.
-2. In der Seitenleiste unter **⚙️ Mehr → KI-Hilfe** den Schlüssel einfügen.
+1. Einen API-Schlüssel erstellen – eine von beiden KIs genügt:
+   - **Gemini (Google):** <https://aistudio.google.com/apikey>. Es gibt ein kostenloses Kontingent; dort darf Google die gesendeten Texte allerdings zur Verbesserung seiner Dienste verwenden. Für ein unveröffentlichtes Manuskript besser die Abrechnung aktivieren.
+   - **Claude (Anthropic):** <https://console.anthropic.com/settings/keys>, etwas Guthaben aufladen.
+2. In der Seitenleiste unter **⚙️ Mehr → KI-Hilfe** den Schlüssel einfügen. Welche KI gemeint ist, erkennt die Buchwerkstatt am Schlüssel (`AIza…` = Gemini, `sk-ant-…` = Claude).
 
-Der Schlüssel wird nur in den Benutzereinstellungen des eigenen Google-Kontos gespeichert, nicht im Dokument. Eine Anfrage kostet je nach Menge der Notizen meist weniger als einen Cent. Das Modell lässt sich in den Einstellungen wählen; voreingestellt ist Claude Opus 5.5.
+Der Schlüssel wird nur in den Benutzereinstellungen des eigenen Google-Kontos gespeichert, nicht im Dokument. Bei Claude kostet eine Anfrage je nach Menge der Notizen meist weniger als einen Cent; das Modell lässt sich in den Einstellungen wählen (voreingestellt: Claude Opus 5.5). Bei Gemini wird immer das aktuelle Gemini Flash verwendet (`gemini-flash-latest`).
 
 ## Tipps
 

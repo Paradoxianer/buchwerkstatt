@@ -144,3 +144,25 @@ test('Steckbrief: Bereiche, Leitfragen, doppelte und unbekannte Felder', () => {
   assert.deepEqual(Core.feldNamen(['# A', 'x | ?', 'y']), ['x', 'y']);
   assert.deepEqual(Core.steckbrief(['Alter', 'Beruf']).map((x) => x.titel), [''], 'alte Listen ohne Bereiche');
 });
+
+test('Stern-Felder: eigene Auswahl, Vorgabe und Sprachwechsel', () => {
+  const felder = ['# Grunddaten', 'Alter | Wie alt?', 'Beruf', '# Familie', 'Eltern'];
+  assert.deepEqual(Core.obenFelder({ felder }, ['Beruf', 'Alter', 'Gibtsnicht']), ['Alter', 'Beruf'], 'Vorgabe in Steckbrief-Reihenfolge');
+  assert.deepEqual(Core.obenFelder({ felder, oben: ['Eltern'] }, ['Alter']), ['Eltern']);
+  assert.deepEqual(Core.obenFelder({ felder, oben: [] }, ['Alter']), [], 'alle Sterne entfernt bleibt leer');
+  assert.deepEqual(Core.obenFelder({ felder, oben: ['Age'] }, ['Alter']), ['Alter'], 'nichts passt mehr → Vorgabe');
+  assert.deepEqual(Core.obenFelder({ felder: ['Alter'] }, null), []);
+});
+
+test('Schreibplan: Wörter pro Tag bis zum Zieldatum, nur an Schreibtagen', () => {
+  // Fr 30.10.2026 bis Fr 6.11.2026, Mo–Fr: 30.10., 2.–6.11. = 6 Tage
+  const p = Core.schreibplan({ gesamtziel: 10000, zieldatum: '2026-11-06', schreibtage: [1, 2, 3, 4, 5], heute: '2026-10-30', woerterMorgen: 4000 });
+  assert.deepEqual(p, { rest: 6000, tage: 6, proTag: 1000, heuteSchreibtag: true, vorbei: false, fertig: false });
+  const wochenende = Core.schreibplan({ gesamtziel: 10000, zieldatum: '2026-11-06', schreibtage: [1, 2, 3, 4, 5], heute: '2026-10-31', woerterMorgen: 4000 });
+  assert.equal(wochenende.heuteSchreibtag, false);
+  assert.equal(wochenende.tage, 5);
+  assert.equal(Core.schreibplan({ gesamtziel: 10000, zieldatum: '2026-11-06', heute: '2026-11-01', woerterMorgen: 0 }).tage, 6, 'ohne Auswahl: jeden Tag');
+  assert.equal(Core.schreibplan({ gesamtziel: 10000, zieldatum: '2026-10-01', heute: '2026-10-30' }).vorbei, true);
+  assert.equal(Core.schreibplan({ gesamtziel: 1000, zieldatum: '2026-12-01', heute: '2026-10-30', woerterMorgen: 1200 }).fertig, true);
+  assert.equal(Core.schreibplan({ gesamtziel: 0, zieldatum: '2026-12-01', heute: '2026-10-30' }), null);
+});

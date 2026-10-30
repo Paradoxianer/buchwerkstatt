@@ -6,6 +6,8 @@
  * - baueIndex:     Alle Namen und „Auch genannt“-Bezeichnungen der Karten.
  * - findeVerweise: Findet Namen und @-Erwähnungen in einem Text.
  * - parseDatum:    Macht aus „12. März“, „3.4.1987“ oder „Tag 5“ eine sortierbare Zahl.
+ * - schreibplan:   Wörter pro Tag bis zum Zieldatum (nur an Schreibtagen).
+ * - obenFelder:    Welche Steckbrief-Felder einen Stern haben (oben auf der Karte).
  * - steckbrief:    Zerlegt die Felder einer Art in Bereiche mit Leitfragen („# Familie“, „Eltern | Wer …?“).
  */
 var BWCore = (function () {
@@ -70,6 +72,51 @@ var BWCore = (function () {
     var namen = [];
     steckbrief(felder, werte).forEach(function (g) { g.felder.forEach(function (f) { namen.push(f.name); }); });
     return namen;
+  }
+
+  /**
+   * Die Felder mit Stern – sie stehen auf der Karte in der Seitenleiste oben.
+   * art.oben ist die eigene Auswahl; ohne Auswahl gilt die kurze Liste (kurz).
+   * Ergebnis in der Reihenfolge des Steckbriefs, nur Felder, die es gibt.
+   */
+  function obenFelder(art, kurz, werte) {
+    var namen = feldNamen(art && art.felder, werte);
+    var nurVorhandene = function (liste) {
+      var drin = {};
+      (liste || []).forEach(function (n) { drin[n] = true; });
+      return namen.filter(function (n) { return drin[n]; });
+    };
+    if (art && Array.isArray(art.oben)) {
+      var eigene = nurVorhandene(art.oben);
+      // Passt keins mehr (z. B. nach einem Sprachwechsel), lieber die Vorgabe zeigen als nichts.
+      if (eigene.length || !art.oben.length) return eigene;
+    }
+    return nurVorhandene(kurz);
+  }
+
+  /**
+   * Schreibplan: Wie viel pro Tag, um das Buch bis zum Zieldatum fertig zu haben?
+   * p = { gesamtziel, zieldatum: 'yyyy-mm-dd', schreibtage: [0..6] (0 = Sonntag),
+   *       heute: 'yyyy-mm-dd', woerterMorgen: Stand zu Beginn des Tages }
+   * Gerechnet wird mit dem Stand vom Morgen – sonst sinkt das Tagesziel beim Schreiben.
+   * Ergebnis: null (kein Plan) oder { proTag, tage, rest, heuteSchreibtag, vorbei, fertig }
+   */
+  function schreibplan(p) {
+    var ziel = Number(p.gesamtziel) || 0;
+    if (!ziel || !/^\d{4}-\d{2}-\d{2}$/.test(p.zieldatum || '')) return null;
+    var tage = (p.schreibtage && p.schreibtage.length ? p.schreibtage : [0, 1, 2, 3, 4, 5, 6]).map(Number);
+    var tag = function (iso) { var t = iso.split('-').map(Number); return Date.UTC(t[0], t[1] - 1, t[2]); };
+    var von = tag(p.heute), bis = tag(p.zieldatum), anzahl = 0;
+    for (var d = von; d <= bis; d += 864e5) if (tage.indexOf(new Date(d).getUTCDay()) >= 0) anzahl++;
+    var rest = Math.max(0, ziel - (Number(p.woerterMorgen) || 0));
+    return {
+      rest: rest,
+      tage: anzahl,
+      proTag: anzahl ? Math.ceil(rest / anzahl) : 0,
+      heuteSchreibtag: tage.indexOf(new Date(von).getUTCDay()) >= 0,
+      vorbei: bis < von,
+      fertig: rest === 0
+    };
   }
 
   /** Wie viele Felder eines Bereichs ausgefüllt sind. */
@@ -393,6 +440,8 @@ var BWCore = (function () {
     steckbrief: steckbrief,
     feldNamen: feldNamen,
     ausgefuellt: ausgefuellt,
+    obenFelder: obenFelder,
+    schreibplan: schreibplan,
     parseNotiz: parseNotiz,
     baueIndex: baueIndex,
     findeVerweise: findeVerweise,

@@ -50,6 +50,8 @@ var BW_STANDARD = {
   sprache: 'auto',
   tagesziel: 500,
   gesamtziel: 0,
+  zieldatum: '',
+  schreibtage: [1, 2, 3, 4, 5],
   anheften: true,
   blaetterAuto: true,
   kiAnzeigen: true,
@@ -261,13 +263,37 @@ function bwEintraegeLesen(ids) {
  */
 var BW_CACHE_FENSTER = 'BW_FENSTER_STAND';
 
-function fensterMelden_(ids) {
+function fensterMelden_(ids, oben) {
   var cache = CacheService.getDocumentCache();
   if (!cache) return;
-  cache.put(BW_CACHE_FENSTER, JSON.stringify({ zeit: Date.now(), ids: ids }), 21600);
+  var stand = { zeit: Date.now(), ids: ids };
+  if (oben) stand.oben = oben;
+  cache.put(BW_CACHE_FENSTER, JSON.stringify(stand), 21600);
 }
 
-/** { zeit, ids } der letzten Änderung aus dem Fenster – oder null. */
+/**
+ * Setzt die Stern-Felder einer Art (aus dem großen Fenster). Nur dieser eine
+ * Wert wird geändert, alles andere in den Einstellungen bleibt, wie es ist.
+ */
+function bwObenSetzen(artId, oben) {
+  var lock = LockService.getDocumentLock();
+  lock.waitLock(20000);
+  try {
+    var e = einstellungen_();
+    var a = (e.arten || []).filter(function (x) { return x.id === artId; })[0];
+    if (!a) return null;
+    a.oben = (oben || []).map(String);
+    bwEinstellungenSpeichern(e);
+    var info = {};
+    info[artId] = a.oben;
+    fensterMelden_([], info);
+    return a.oben;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/** { zeit, ids, oben? } der letzten Änderung aus dem Fenster – oder null. */
 function fensterStand_() {
   try {
     var cache = CacheService.getDocumentCache();

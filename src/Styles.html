@@ -153,6 +153,13 @@
   .felder textarea:hover, .freitext:hover { background: var(--grund); }
   .felder textarea:focus, .freitext:focus { border-color: var(--akzent); background: var(--flaeche); }
   /* Steckbrief in Bereichen (Seitenleiste) */
+  .stern { border: 0; background: none; padding: 0 3px 0 0; font-size: 12px; line-height: 1; color: var(--text-3); opacity: .45; cursor: pointer; vertical-align: baseline; }
+  .stern:hover, .stern:focus-visible { opacity: 1; color: #e3a008; }
+  .stern.an { color: #e3a008; opacity: 1; }
+  .felder.oben { margin-bottom: 6px; }
+  .felder.oben textarea::placeholder { font-style: italic; color: var(--text-3); }
+  .felder.oben textarea:placeholder-shown { background: var(--grund); }
+  .stern-hinweis { margin-top: 4px; font-size: 11px; }
   .sb-gruppe { border-top: 1px solid var(--linie); }
   .sb-gruppe:first-of-type { border-top: 0; }
   .sb-gruppe summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 6px; padding: 6px 2px; font-weight: 600; font-size: 12.5px; }
@@ -216,6 +223,11 @@
   .balken div.heute { outline: 2px solid var(--akzent); outline-offset: 1px; }
   .balken-achse { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-3); margin-top: 3px; }
   .zielfelder { display: grid; grid-template-columns: 1fr auto; gap: 6px 8px; align-items: center; }
+  .zielfelder input[type=date] { width: 130px; text-align: left; }
+  .ausgerechnet { font-weight: 700; padding: 4px 6px; text-align: right; }
+  .tage-wahl { display: flex; gap: 3px; flex-wrap: wrap; }
+  .tag-knopf { flex: 1; min-width: 30px; border: 1px solid var(--linie); background: var(--flaeche); border-radius: 6px; padding: 4px 0; font-size: 11.5px; color: var(--text-2); }
+  .tag-knopf.an { background: var(--akzent); border-color: var(--akzent); color: #fff; font-weight: 600; }
   .zielfelder input { width: 90px; border: 1px solid var(--linie); border-radius: 6px; padding: 4px 6px; text-align: right; outline: 0; }
   .fortschritt { height: 8px; background: var(--grund); border-radius: 4px; overflow: hidden; margin-top: 6px; }
   .fortschritt div { height: 100%; background: var(--akzent); border-radius: 4px; }

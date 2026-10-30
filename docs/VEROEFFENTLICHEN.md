@@ -97,7 +97,7 @@ Cloud Console → **APIs & Dienste → OAuth-Zustimmungsbildschirm** (in neueren
 | `https://www.googleapis.com/auth/spreadsheets` | sensibel | Stores the user’s notes, cards and relationships in a Google Sheet that the add-on creates in the user’s own Drive. |
 | `https://www.googleapis.com/auth/drive.file` | nicht sensibel | Moves, renames and trashes only the files and folders the add-on created itself (the sheet, card documents and their folder). No access to other files. |
 | `https://www.googleapis.com/auth/script.container.ui` | nicht sensibel | Shows the sidebar and the Extensions menu in Google Docs. |
-| `https://www.googleapis.com/auth/script.external_request` | sensibel | Only for the optional AI feature: when the user explicitly clicks “Fill in profile” or “Check for contradictions” and has entered their own Anthropic API key, the card’s text and related notes are sent to api.anthropic.com. |
+| `https://www.googleapis.com/auth/script.external_request` | sensibel | Only for the optional AI feature: when the user explicitly clicks “Fill in profile” or “Check for contradictions” and has entered their own Anthropic or Google Gemini API key, the card’s text and related notes are sent to api.anthropic.com or generativelanguage.googleapis.com. |
 
 Solange die App im Status **„Test“** ist, können bis zu 100 eingetragene Testnutzer sie ohne Überprüfung nutzen. Deine Frau kannst du dort schon eintragen.
 
@@ -155,7 +155,7 @@ Weil die App sensible Bereiche nutzt, prüft Google sie vor der Veröffentlichun
    - „Namen im Text markieren“ zeigen.
 4. **`spreadsheets`:** `Person Lena: 34, midwife` eingeben, unter Mehr → „Tabelle öffnen“ die angelegte Tabelle mit dem Eintrag zeigen.
 5. **`drive.file`:** Unter Mehr → „Alle Blätter jetzt erstellen“ klicken, den Ordner „… – Buchwerkstatt“ mit Tabelle und Personenblatt in Drive zeigen. Erwähnen, dass nur diese selbst angelegten Dateien zugänglich sind.
-6. **`script.external_request`:** Unter Mehr → KI-Hilfe einen Anthropic-Schlüssel eintragen, auf einer Karte „Fill in profile“ klicken und den Vorschlag zeigen. Erklären, dass nur bei diesem ausdrücklichen Klick Text an api.anthropic.com geht.
+6. **`script.external_request`:** Unter Mehr → KI-Hilfe einen Gemini- oder Anthropic-Schlüssel eintragen, auf einer Karte „Fill in profile“ klicken und den Vorschlag zeigen. Erklären, dass nur bei diesem ausdrücklichen Klick Text an die gewählte KI-API geht.
 7. **Löschen:** eine Karte löschen; das Personenblatt wandert in den Papierkorb.
 
 In das Begründungsfeld kommen die englischen Texte aus der Tabelle in Schritt 4. Rückfragen von Google kommen per E-Mail an die Support-Adresse. Meist geht es um Details der Datenschutzerklärung oder des Videos.

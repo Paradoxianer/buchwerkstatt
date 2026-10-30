@@ -1,5 +1,8 @@
 /**
- * KI-Hilfe mit Claude (Anthropic).
+ * KI-Hilfe mit Claude (Anthropic) oder Gemini (Google).
+ *
+ * Welche KI, ergibt sich aus dem Schlüssel: „AIza…“ ist ein Google-Schlüssel
+ * (aistudio.google.com), alles andere ein Anthropic-Schlüssel.
  *
  * - Felder füllen: Aus Freitext und allen Notizen zu einer Karte werden die
  *   Felder (Alter, Beruf …), weitere Namen und Beziehungen herausgesucht.
@@ -17,6 +20,9 @@
  */
 
 var BW_KI_URL = 'https://api.anthropic.com/v1/messages';
+var BW_KI_URL_GOOGLE = 'https://generativelanguage.googleapis.com/v1beta/models/';
+var BW_KI_MODELL_GOOGLE = 'gemini-flash-latest';
+// Der Name stammt aus der Zeit, als es nur Claude gab – bleibt, damit gespeicherte Schlüssel gelten.
 var BW_PROP_KI = 'BW_ANTHROPIC_KEY';
 var BW_KI_SPRACHEN = { de: 'German', en: 'English', fr: 'French', es: 'Spanish', it: 'Italian', pt: 'Portuguese', nl: 'Dutch' };
 
@@ -26,7 +32,11 @@ function kiSprache_() {
 
 function bwKiStatus() {
   var key = PropertiesService.getUserProperties().getProperty(BW_PROP_KI);
-  return { aktiv: !!key, ende: key ? key.slice(-4) : '' };
+  return { aktiv: !!key, ende: key ? key.slice(-4) : '', anbieter: key ? kiAnbieter_(key) : '' };
+}
+
+function kiAnbieter_(key) {
+  return /^AIza/.test(String(key || '').trim()) ? 'google' : 'anthropic';
 }
 
 function bwKiSchluesselSetzen(key) {
@@ -137,6 +147,12 @@ function bwKiPruefen(anfrage) {
 function kiAnfrage_(system, prompt, schema, maxTokens) {
   var key = PropertiesService.getUserProperties().getProperty(BW_PROP_KI);
   if (!key) throw new Error(tx_('kiKeinSchluessel'));
+  return kiAnbieter_(key) === 'google'
+    ? kiGoogle_(key, system, prompt, schema)
+    : kiAnthropic_(key, system, prompt, schema, maxTokens);
+}
+
+function kiAnthropic_(key, system, prompt, schema, maxTokens) {
   var modell = einstellungen_().kiModell || BW_STANDARD.kiModell;
   var body = {
     model: modell,
@@ -170,5 +186,40 @@ function kiAnfrage_(system, prompt, schema, maxTokens) {
   if (daten.stop_reason === 'refusal') throw new Error('✨ ' + tx_('kiAbgelehnt'));
   if (daten.stop_reason === 'max_tokens') throw new Error('✨ ' + tx_('kiZuLang'));
   var text = (daten.content || []).filter(function (b) { return b.type === 'text'; }).map(function (b) { return b.text; }).join('');
+  return JSON.parse(text);
+}
+
+/** Gemini über die Gemini API (Schlüssel aus Google AI Studio). */
+function kiGoogle_(key, system, prompt, schema) {
+  var body = {
+    systemInstruction: { parts: [{ text: system }] },
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    // Gemini rechnet das Nachdenken zu den Ausgabe-Tokens – daher großzügig.
+    generationConfig: { responseMimeType: 'application/json', responseJsonSchema: schema, maxOutputTokens: 16384 }
+  };
+  var antwort = UrlFetchApp.fetch(BW_KI_URL_GOOGLE + BW_KI_MODELL_GOOGLE + ':generateContent', {
+    method: 'post',
+    contentType: 'application/json',
+    headers: { 'x-goog-api-key': key },
+    payload: JSON.stringify(body),
+    muteHttpExceptions: true
+  });
+  var code = antwort.getResponseCode();
+  var daten = {};
+  try { daten = JSON.parse(antwort.getContentText()); } catch (err) { daten = {}; }
+  if (code !== 200) {
+    var fehler = daten.error || {};
+    var meldung = fehler.message || 'HTTP ' + code;
+    if (code === 401 || code === 403 || /API_KEY_INVALID|API key not valid/i.test(JSON.stringify(fehler))) meldung = tx_('ki401');
+    else if (code === 429 || code === 503) meldung = tx_('kiAusgelastet');
+    throw new Error('✨ ' + meldung);
+  }
+  if (daten.promptFeedback && daten.promptFeedback.blockReason) throw new Error('✨ ' + tx_('kiAbgelehnt'));
+  var kandidat = (daten.candidates || [])[0] || {};
+  if (kandidat.finishReason === 'MAX_TOKENS') throw new Error('✨ ' + tx_('kiZuLang'));
+  if (/SAFETY|PROHIBITED|BLOCKLIST|RECITATION/.test(kandidat.finishReason || '')) throw new Error('✨ ' + tx_('kiAbgelehnt'));
+  var text = ((kandidat.content || {}).parts || []).filter(function (p) { return p.text && !p.thought; })
+    .map(function (p) { return p.text; }).join('');
+  if (!text) throw new Error('✨ ' + tx_('kiAbgelehnt'));
   return JSON.parse(text);
 }

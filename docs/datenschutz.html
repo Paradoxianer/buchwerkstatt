@@ -17,7 +17,7 @@
   <nav class="sprachen"><a href="#de">Deutsch</a><a href="#en">English</a></nav>
 
   <section id="de">
-    <div class="hinweis"><b>Kurz gesagt:</b> Die Buchwerkstatt hat keinen eigenen Server. Alles, was du anlegst, liegt in deinem eigenen Google Drive. Es werden keine Daten an den Entwickler übertragen, es gibt keine Werbung, keine Cookies und keine Auswertung. Nur wenn du freiwillig die KI-Hilfe mit deinem eigenen Schlüssel nutzt, gehen einzelne Texte an Anthropic.</div>
+    <div class="hinweis"><b>Kurz gesagt:</b> Die Buchwerkstatt hat keinen eigenen Server. Alles, was du anlegst, liegt in deinem eigenen Google Drive. Es werden keine Daten an den Entwickler übertragen, es gibt keine Werbung, keine Cookies und keine Auswertung. Nur wenn du freiwillig die KI-Hilfe mit deinem eigenen Schlüssel nutzt, gehen einzelne Texte an Anthropic oder Google (je nach Schlüssel).</div>
 
     <h2>1. Verantwortlich</h2>
     <p><span class="platzhalter">Vorname Nachname</span><br>
@@ -41,18 +41,18 @@
       <tr><td><code>spreadsheets</code></td><td>Die Tabelle mit deinen Notizen und Karten anlegen, lesen und schreiben.</td></tr>
       <tr><td><code>drive.file</code></td><td>Die von der Erweiterung angelegten Dateien und Ordner verwalten (umbenennen, in den Buch-Ordner verschieben, gelöschte Karten in den Papierkorb legen). Andere Dateien in deinem Drive sind damit <b>nicht</b> zugänglich.</td></tr>
       <tr><td><code>script.container.ui</code></td><td>Die Seitenleiste und das Menü in Google Docs anzeigen.</td></tr>
-      <tr><td><code>script.external_request</code></td><td>Nur für die optionale KI-Hilfe: Anfragen an die Anthropic-API senden.</td></tr>
+      <tr><td><code>script.external_request</code></td><td>Nur für die optionale KI-Hilfe: Anfragen an die Anthropic-API bzw. die Gemini-API von Google senden.</td></tr>
     </table>
     <p>Die Nutzung und Weitergabe von Informationen, die die Buchwerkstatt über Google-APIs erhält, an andere Apps erfolgt gemäß der <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, einschließlich der Anforderungen zur eingeschränkten Nutzung („Limited Use“). Daten werden nicht verkauft, nicht für Werbung verwendet und nicht zum Trainieren allgemeiner KI-Modelle weitergegeben.</p>
 
-    <h2>4. Optionale KI-Hilfe (Anthropic Claude)</h2>
-    <p>Die KI-Hilfe ist ausgeschaltet, solange du keinen eigenen API-Schlüssel von Anthropic einträgst. Mit Schlüssel wird nur dann etwas gesendet, wenn du auf einer Karte ausdrücklich „Steckbrief ausfüllen“ oder „Widersprüche prüfen“ anklickst. Dann gehen an die Anthropic-API (<code>api.anthropic.com</code>):</p>
+    <h2>4. Optionale KI-Hilfe (Anthropic Claude oder Google Gemini)</h2>
+    <p>Die KI-Hilfe ist ausgeschaltet, solange du keinen eigenen API-Schlüssel von Anthropic oder Google einträgst. Mit Schlüssel wird nur dann etwas gesendet, wenn du auf einer Karte ausdrücklich „Steckbrief ausfüllen“ oder „Widersprüche prüfen“ anklickst. Dann gehen – je nach Schlüssel – an die Anthropic-API (<code>api.anthropic.com</code>) oder an die Gemini-API (<code>generativelanguage.googleapis.com</code>):</p>
     <ul>
       <li>Name, Felder und Beschreibung dieser einen Karte,</li>
       <li>die Notizen und Zeitstrahl-Einträge, die diese Karte erwähnen (mit Kapitelüberschrift),</li>
       <li>die Namen der übrigen Karten (damit Beziehungen erkannt werden).</li>
     </ul>
-    <p>Dein Manuskripttext selbst wird nicht gesendet. Die Anfrage läuft über dein eigenes Anthropic-Konto; dort gelten die <a href="https://www.anthropic.com/legal/privacy">Datenschutzbestimmungen von Anthropic</a>. Der Entwickler der Buchwerkstatt erhält nichts davon. Du kannst die KI jederzeit ausblenden oder den Schlüssel entfernen (Mehr → KI-Hilfe).</p>
+    <p>Dein Manuskripttext selbst wird nicht gesendet. Die Anfrage läuft über dein eigenes Konto beim jeweiligen Anbieter; es gelten die <a href="https://www.anthropic.com/legal/privacy">Datenschutzbestimmungen von Anthropic</a> bzw. die <a href="https://ai.google.dev/gemini-api/terms">Nutzungsbedingungen der Gemini API</a>. Achtung: Im kostenlosen Gemini-Kontingent darf Google die gesendeten Inhalte zur Verbesserung seiner Dienste verwenden und von Menschen prüfen lassen; mit aktivierter Abrechnung nicht. Der Entwickler der Buchwerkstatt erhält nichts davon. Du kannst die KI jederzeit ausblenden oder den Schlüssel entfernen (Mehr → KI-Hilfe).</p>
 
     <h2>5. Keine weiteren Empfänger</h2>
     <p>Die Buchwerkstatt verwendet keine Analyse-Dienste, keine Cookies, keine Werbung und keine eigenen Server. Die Startseite und diese Erklärung werden über GitHub Pages ausgeliefert; dabei verarbeitet GitHub technisch nötige Verbindungsdaten (siehe <a href="https://docs.github.com/de/site-policy/privacy-policies/github-general-privacy-statement">Datenschutzerklärung von GitHub</a>).</p>
@@ -74,7 +74,7 @@
 
   <section id="en">
     <h2>English – Privacy policy</h2>
-    <div class="hinweis"><b>In short:</b> Buchwerkstatt has no server of its own. Everything you create stays in your own Google Drive. No data is sent to the developer; there is no advertising, no cookies and no tracking. Only if you choose to use the AI help with your own key are individual texts sent to Anthropic.</div>
+    <div class="hinweis"><b>In short:</b> Buchwerkstatt has no server of its own. Everything you create stays in your own Google Drive. No data is sent to the developer; there is no advertising, no cookies and no tracking. Only if you choose to use the AI help with your own key are individual texts sent to Anthropic or Google (depending on the key).</div>
 
     <h3>1. Controller</h3>
     <p>See section 1 above (German version).</p>
@@ -88,11 +88,11 @@
     </ul>
 
     <h3>3. Google permissions</h3>
-    <p><code>documents</code> – read the open manuscript, pin notes, highlight names, write card documents. <code>spreadsheets</code> – the sheet with your notes. <code>drive.file</code> – manage only the files and folders the add-on created itself; no access to your other files. <code>script.container.ui</code> – show the sidebar and menu. <code>script.external_request</code> – only for the optional AI help (Anthropic API).</p>
+    <p><code>documents</code> – read the open manuscript, pin notes, highlight names, write card documents. <code>spreadsheets</code> – the sheet with your notes. <code>drive.file</code> – manage only the files and folders the add-on created itself; no access to your other files. <code>script.container.ui</code> – show the sidebar and menu. <code>script.external_request</code> – only for the optional AI help (Anthropic API or Google Gemini API).</p>
     <p>Buchwerkstatt’s use and transfer to any other app of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the Limited Use requirements. Data is never sold, used for advertising, or shared to train general-purpose AI models.</p>
 
-    <h3>4. Optional AI help (Anthropic Claude)</h3>
-    <p>Off unless you enter your own Anthropic API key. Even then, data is only sent when you explicitly click “Fill in profile” or “Check for contradictions” on a card: the name, fields and description of that card, the notes and timeline entries mentioning it (with chapter heading), and the names of the other cards. Your manuscript text itself is not sent. The request runs through your own Anthropic account under <a href="https://www.anthropic.com/legal/privacy">Anthropic’s privacy policy</a>; the developer receives nothing.</p>
+    <h3>4. Optional AI help (Anthropic Claude or Google Gemini)</h3>
+    <p>Off unless you enter your own Anthropic or Google API key. Even then, data is only sent when you explicitly click “Fill in profile” or “Check for contradictions” on a card: the name, fields and description of that card, the notes and timeline entries mentioning it (with chapter heading), and the names of the other cards. Your manuscript text itself is not sent. The request goes to <code>api.anthropic.com</code> or <code>generativelanguage.googleapis.com</code> and runs through your own account with that provider under <a href="https://www.anthropic.com/legal/privacy">Anthropic’s privacy policy</a> or the <a href="https://ai.google.dev/gemini-api/terms">Gemini API terms</a>. Note: on Gemini’s free tier Google may use submitted content to improve its services and have it reviewed by humans; with billing enabled it does not; the developer receives nothing.</p>
 
     <h3>5. No other recipients</h3>
     <p>No analytics, cookies, advertising or own servers. This website is served by GitHub Pages.</p>

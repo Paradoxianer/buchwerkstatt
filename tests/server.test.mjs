@@ -63,7 +63,8 @@ function welt() {
     const a = { text, heading: 'NORMAL', links: [] };
     liste.push(a);
     const p = {
-      setText(t) { a.text = t; return p; }, setHeading(h) { a.heading = h; return p; },
+      // Wie in Apps Script: setText gibt nichts zurück (nicht verkettbar).
+      setText(t) { a.text = t; }, setHeading(h) { a.heading = h; return p; },
       editAsText() { return textObj(a); }
     };
     return p;
@@ -71,7 +72,12 @@ function welt() {
   function body(liste) {
     return {
       clear() { liste.length = 0; liste.push({ text: '', heading: 'NORMAL', links: [] }); },
-      getChild(i) { const a = liste[i]; return { asParagraph: () => ({ setText(t) { a.text = t; return this; }, setHeading(h) { a.heading = h; return this; } }) }; },
+      getParagraphs() {
+        return liste.map((a) => {
+          const p = { setText(t) { a.text = t; }, setHeading(h) { a.heading = h; return p; }, editAsText() { return textObj(a); } };
+          return p;
+        });
+      },
       appendParagraph(t) { return absatz(liste, t); }
     };
   }
@@ -141,7 +147,7 @@ function welt() {
     CacheService: { getDocumentCache: () => cache }
   };
   const namen = Object.keys(globals);
-  const fns = new Function(...namen, code + '; return { bwSpeichern, bwBlaetterSync, bwLoeschen, bwLaden, datenbank_, bwFelderSetzen, bwEintraegeLesen, bwEinstellungenSpeichern, einstellungen_, fragebogen_, kurzeFelder_, neueAusfuehrung: function () { bwCacheDb_ = null; bwCacheSprache_ = null; } };')(...namen.map((n) => globals[n]));
+  const fns = new Function(...namen, code + '; return { bwSpeichern, bwBlaetterSync, bwLoeschen, bwLaden, datenbank_, bwFelderSetzen, bwEintraegeLesen, bwEinstellungenSpeichern, bwObenSetzen, einstellungen_, fragebogen_, kurzeFelder_, neueAusfuehrung: function () { bwCacheDb_ = null; bwCacheSprache_ = null; } };')(...namen.map((n) => globals[n]));
   return { fns, dateien, docs, dokProps, zugriff };
 }
 
@@ -243,4 +249,18 @@ test('Steckbrief-Vorlagen: neu ausführlich, Auswahl bleibt, Speicher klein', ()
   assert.ok(dokProps.getProperty('BW_EINSTELLUNGEN').length < 3000, 'Verweis statt Liste gespeichert');
   fns.neueAusfuehrung();
   assert.deepEqual(person().felder, fns.fragebogen_('de', 'person'));
+});
+
+test('Stern-Felder aus dem großen Fenster: nur die Art ändern und der Seitenleiste melden', () => {
+  const { fns } = welt();
+  const e = fns.einstellungen_();
+  e.tagesziel = 777;
+  fns.bwEinstellungenSpeichern(e);
+  fns.bwObenSetzen('person', ['Alter', 'Eltern']);
+  fns.neueAusfuehrung();
+  const nachher = fns.einstellungen_();
+  assert.deepEqual(nachher.arten.find((a) => a.id === 'person').oben, ['Alter', 'Eltern']);
+  assert.equal(nachher.tagesziel, 777, 'übrige Einstellungen bleiben');
+  assert.deepEqual(nachher.arten.find((a) => a.id === 'person').felder, fns.fragebogen_('de', 'person'), 'Fragebogen bleibt');
+  assert.deepEqual(fns.bwLaden().fensterStand.oben, { person: ['Alter', 'Eltern'] });
 });

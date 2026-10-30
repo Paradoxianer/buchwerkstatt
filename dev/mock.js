@@ -54,7 +54,7 @@
       { id: 'zeit', name: 'Ereignis', mehrzahl: 'Zeitstrahl', icon: '📅', farbe: '#8430ce', hell: '#efe1fb', woerter: ['Zeit', 'Wann'], karte: false, felder: [] },
       { id: 'idee', name: 'Idee', mehrzahl: 'Ideen', icon: '💡', farbe: '#c5221f', hell: '#fbe0e0', woerter: ['Idee'], karte: false, felder: [] }
     ],
-    sprache: 'auto', tagesziel: 500, gesamtziel: 80000, anheften: true, blaetterAuto: true, kiAnzeigen: true, kiModell: 'claude-opus-5-5', hinweisGesehen: false
+    sprache: 'auto', tagesziel: 500, gesamtziel: 80000, zieldatum: '', schreibtage: [1, 2, 3, 4, 5], anheften: true, blaetterAuto: true, kiAnzeigen: true, kiModell: 'claude-opus-5-5', hinweisGesehen: false
   };
   db.einstellungen = JSON.parse(JSON.stringify(STANDARD));
   db.einstellungen.arten = standardArten[kontoSprache];
@@ -126,11 +126,19 @@
       }
       return { gesamt: 41230, heute: 260, verlauf: verlauf };
     },
-    bwKiStatus: function () { return { aktiv: db.ki, ende: 'abcd' }; },
-    bwKiSchluesselSetzen: function (k) { db.ki = !!k; return { aktiv: db.ki, ende: 'abcd' }; },
+    bwKiStatus: function () { return { aktiv: db.ki, ende: 'abcd', anbieter: db.kiAnbieter }; },
+    bwKiSchluesselSetzen: function (k) {
+      db.ki = !!k;
+      db.kiAnbieter = /^AIza/.test(k) ? 'google' : k ? 'anthropic' : '';
+      return { aktiv: db.ki, ende: 'abcd', anbieter: db.kiAnbieter };
+    },
     bwFensterOeffnen: function (ansicht, start) {
       window.open('fenster.html#id=' + start.id, '_blank', 'width=980,height=680');
       return true;
+    },
+    bwObenSetzen: function (artId, oben) {
+      db.einstellungen.arten.forEach(function (a) { if (a.id === artId) a.oben = oben; });
+      return oben;
     },
     bwFelderSetzen: function (id, aenderungen) {
       var x = db.eintraege.filter(function (y) { return y.id === id; })[0];

@@ -94,7 +94,7 @@ var BWFenster = (function () {
     el.innerHTML = '<span>' + F.h(text) + '</span><button title="' + F.th('schliessen') + '">✕</button>';
     el.hidden = false;
     el.onclick = function () { el.hidden = true; };
-    toastTimer = setTimeout(function () { el.hidden = true; }, opt.fehler ? 7000 : 4000);
+    if (!opt.fehler) toastTimer = setTimeout(function () { el.hidden = true; }, 4000);
   }
 
   function berechne() {

@@ -39,8 +39,15 @@ function bwBlaetterSync(blaetter) {
   });
 
   // 2. Inhalte schreiben – jetzt kennen wir alle Ziele für Links.
+  // Klappt ein Blatt nicht, sollen die anderen trotzdem fertig werden.
+  var fehler = [];
   blaetter.forEach(function (b) {
-    schreibeBlatt_(blattVon[b.id], b, blattVon);
+    try {
+      schreibeBlatt_(blattVon[b.id], b, blattVon);
+    } catch (err) {
+      console.error('Personenblatt „' + b.titel + '“: ' + (err && err.stack || err));
+      fehler.push(b.titel + ': ' + (err && err.message || err));
+    }
   });
 
   // 3. Neue Blatt-IDs in der Tabelle merken.
@@ -50,6 +57,7 @@ function bwBlaetterSync(blaetter) {
       schreibeZeile_(sheet, BW_EINTRAG, e);
     }
   });
+  if (fehler.length) throw new Error(fehler.join('\n'));
   return ergebnis;
 }
 
@@ -57,16 +65,17 @@ function schreibeBlatt_(docId, b, blattVon) {
   var doc = DocumentApp.openById(docId);
   var body = doc.getBody();
   body.clear();
-  body.getChild(0).asParagraph().setText(b.titel).setHeading(DocumentApp.ParagraphHeading.TITLE);
-  if (b.untertitel) {
-    body.appendParagraph(b.untertitel).setHeading(DocumentApp.ParagraphHeading.SUBTITLE);
-  }
+  // Hier wird bewusst nichts verkettet: Einige Apps-Script-Methoden geben
+  // nichts zurück (z. B. setText), und dann bricht die Kette mit „null“ ab.
+  var titel = body.getParagraphs()[0];
+  titel.setText(b.titel || '');
+  titel.setHeading(DocumentApp.ParagraphHeading.TITLE);
+  if (b.untertitel) absatz_(body, b.untertitel, DocumentApp.ParagraphHeading.SUBTITLE);
   (b.abschnitte || []).forEach(function (a) {
     if (!a.zeilen || !a.zeilen.length) return;
-    body.appendParagraph(a.titel).setHeading(DocumentApp.ParagraphHeading.HEADING2);
+    if (a.titel) absatz_(body, a.titel, DocumentApp.ParagraphHeading.HEADING2);
     a.zeilen.forEach(function (stuecke) {
-      var absatz = body.appendParagraph('');
-      absatz.setHeading(DocumentApp.ParagraphHeading.NORMAL);
+      var absatz = absatz_(body, '', DocumentApp.ParagraphHeading.NORMAL);
       var text = absatz.editAsText();
       var pos = 0;
       stuecke.forEach(function (s) {
@@ -79,10 +88,18 @@ function schreibeBlatt_(docId, b, blattVon) {
       });
     });
   });
-  body.appendParagraph('');
-  body.appendParagraph(b.fusszeile || '')
-    .editAsText().setItalic(true).setFontSize(9).setForegroundColor('#80868b');
+  absatz_(body, '', DocumentApp.ParagraphHeading.NORMAL);
+  var fuss = absatz_(body, b.fusszeile || '', DocumentApp.ParagraphHeading.NORMAL).editAsText();
+  fuss.setItalic(true);
+  fuss.setFontSize(9);
+  fuss.setForegroundColor('#80868b');
   doc.saveAndClose();
+}
+
+function absatz_(body, text, ueberschrift) {
+  var absatz = body.appendParagraph(String(text));
+  absatz.setHeading(ueberschrift);
+  return absatz;
 }
 
 /** Ordner „<Buch> – Welt“ im Buch-Ordner. Gibt die Ordner-ID zurück. */

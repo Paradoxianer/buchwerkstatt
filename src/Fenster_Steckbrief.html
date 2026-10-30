@@ -24,7 +24,8 @@
   .sb-bereich-kopf { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
   .sb-bereich-kopf h2 { margin: 0; font-size: 17px; font-weight: 600; flex: 1; }
   .sb-feld { background: var(--flaeche); border-radius: var(--radius); box-shadow: var(--schatten); padding: 10px 12px 12px; margin-bottom: 10px; }
-  .sb-feld label { display: block; font-weight: 600; }
+  .sb-feld label { font-weight: 600; }
+  .sb-feld .stern { font-size: 15px; padding-right: 5px; }
   .sb-feld.voll label::after { content: ' ✓'; color: var(--c); }
   .sb-frage { color: var(--text-2); font-size: 12.5px; margin: 2px 0 6px; }
   .sb-feld textarea { display: block; width: 100%; margin-top: 4px; border: 1px solid var(--linie); border-radius: 6px; padding: 6px 8px; resize: none; min-height: 44px; outline: 0; overflow: hidden; font-size: 14px; line-height: 1.5; background: var(--flaeche); }
@@ -110,9 +111,12 @@ BWFenster.registriere('steckbrief', (function () {
         '<button class="knopf primaer klein" data-aktion="alle">' + th('fenster.alleUebernehmen') + '</button>' +
         '<button class="knopf klein" data-aktion="verwerfen">' + th('ki.verwerfen') + '</button></div></div>';
     }
+    var oben = sterne();
     html += g.felder.map(function (f, i) {
-      var wert = e.felder[f.name] || '';
-      return '<div class="sb-feld' + (wert.trim() ? ' voll' : '') + '"><label for="sb-f' + i + '">' + h(f.name) + '</label>' +
+      var wert = e.felder[f.name] || '', an = oben.indexOf(f.name) >= 0;
+      return '<div class="sb-feld' + (wert.trim() ? ' voll' : '') + '">' +
+        '<button class="stern' + (an ? ' an' : '') + '" data-aktion="stern" data-f="' + i + '" title="' + th(an ? 'karte.stern.weg' : 'karte.stern.dazu') + '">' + (an ? '★' : '☆') + '</button>' +
+        '<label for="sb-f' + i + '">' + h(f.name) + '</label>' +
         (f.frage ? '<div class="sb-frage">' + h(f.frage) + '</div>' : '') +
         '<textarea id="sb-f' + i + '" data-f="' + i + '" rows="2">' + h(wert) + '</textarea>' +
         (v && v[f.name] ? '<div class="sb-vorschlag"><span>✨ ' + h(v[f.name]) + '</span>' +
@@ -151,6 +155,20 @@ BWFenster.registriere('steckbrief', (function () {
   }
 
   function feld(i) { return gruppen[aktiv].felder[Number(i)]; }
+
+  /** Felder mit Stern – stehen in der Seitenleiste oben auf der Karte. */
+  function sterne() {
+    return F.C.obenFelder(a, ((F.daten.kurzeArten || {})[F.I.sprache()] || {})[a.id], e.felder);
+  }
+
+  function sternUmschalten(name) {
+    var liste = sterne(), an = liste.indexOf(name) < 0;
+    a.oben = an ? liste.concat([name]) : liste.filter(function (n) { return n !== name; });
+    render();
+    F.sichere('bwObenSetzen', a.id, a.oben).then(function () {
+      F.toast(t(an ? 'karte.stern.gesetzt' : 'karte.stern.entfernt', { feld: name, art: a.mehrzahl || a.name }));
+    });
+  }
 
   function setze(name, wert) {
     e.felder[name] = wert;
@@ -242,6 +260,7 @@ BWFenster.registriere('steckbrief', (function () {
     if (was === 'tab') zeigeBereich(Number(b.dataset.i));
     else if (was === 'fertig') F.schliessen();
     else if (was === 'ki') kiVorschlagen();
+    else if (was === 'stern') sternUmschalten(feld(b.dataset.f).name);
     else if (was === 'alle') uebernehmen(Object.keys(vorschlag.felder));
     else if (was === 'verwerfen') { vorschlag = null; render(); }
     else if (was === 'ja') uebernehmen([feld(b.dataset.f).name]);
