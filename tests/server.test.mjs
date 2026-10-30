@@ -159,7 +159,7 @@ function welt() {
     CacheService: { getDocumentCache: () => cache }
   };
   const namen = Object.keys(globals);
-  const fns = new Function(...namen, code + '; return { bwSpeichern, bwBlaetterSync, bwLoeschen, bwLaden, datenbank_, bwFelderSetzen, bwEintraegeLesen, bwEinstellungenSpeichern, bwObenSetzen, bwTabelleNeuAnlegen, bwBildSetzen, bwBildEntfernen, einstellungen_, fragebogen_, kurzeFelder_, neueAusfuehrung: function () { bwCacheDb_ = null; bwCacheSprache_ = null; } };')(...namen.map((n) => globals[n]));
+  const fns = new Function(...namen, code + '; return { bwSpeichern, bwBlaetterSync, bwLoeschen, bwLaden, datenbank_, bwFelderSetzen, bwEintraegeLesen, bwEinstellungenSpeichern, bwObenSetzen, bwTabelleNeuAnlegen, bwBildSetzen, bwBildEntfernen, einstellungen_, fragebogen_, kurzeFelder_, namensmuster_, fundstellen_, neueAusfuehrung: function () { bwCacheDb_ = null; bwCacheSprache_ = null; } };')(...namen.map((n) => globals[n]));
   return { fns, dateien, docs, dokProps, zugriff, tabellen };
 }
 
@@ -333,4 +333,18 @@ test('Bilder: speichern, ersetzen, im Personenblatt, beim Löschen weg', () => {
   fns.bwLoeschen(lena.id);
   assert.equal(dateien[r2.datei].trashed, true, 'Bild beim Löschen der Karte im Papierkorb');
   assert.deepEqual(fns.bwLaden().bilder, {});
+});
+
+test('Fundstellen: ganze Wörter mit Genitiv, Nummer im Absatz und Text drumherum', () => {
+  const { fns } = welt();
+  const muster = fns.namensmuster_(['Lena', 'Lena Hartmann', 'x']);
+  const text = 'Helena kam. Lena Hartmann lachte. Später sah Lena den Fluss, und Lenas Uhr tickte leise in der Tasche ihres alten grünen Mantels.';
+  const funde = fns.fundstellen_(text, muster);
+  assert.deepEqual(funde.map((f) => f.wort), ['Lena Hartmann', 'Lena', 'Lena'], 'nicht in „Helena“, längerer Name zuerst');
+  // nr zählt, wie oft genau dieses Wort davor im Absatz steht – so findet findText dieselbe Stelle.
+  assert.deepEqual(funde.map((f) => f.nr), [0, 1, 2]);
+  assert.equal(funde[1].vor, 'Helena kam. Lena Hartmann lachte. Später sah ');
+  assert.equal(funde[2].vor, '…lachte. Später sah Lena den Fluss, und ', 'vorne an Wortgrenze gekürzt');
+  assert.ok(funde[2].nach.endsWith('…') && !funde[2].nach.includes('Mantels'), 'an Wortgrenze gekürzt');
+  assert.equal(fns.namensmuster_(['x', '']), null);
 });

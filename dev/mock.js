@@ -116,7 +116,20 @@
     bwTextstellen: function () { return db.textstellen; },
     bwZuTextstelle: function () { return true; },
     bwZuAbsatz: function () { return true; },
-    bwVorkommen: function () { return [{ kapitel: kapitel[0], anzahl: 7, tab: '', index: 3 }, { kapitel: kapitel[1], anzahl: 3, tab: '', index: 30 }]; },
+    bwZuFundstelle: function () { return true; },
+    bwVorkommen: function (begriffe) {
+      var name = begriffe[0] || 'Lena';
+      var f = function (vor, nach, absatz) { return { absatz: absatz, wort: name, nr: 0, vor: vor, nach: nach }; };
+      return [
+        { kapitel: kapitel[0], anzahl: 3, tab: '', treffer: [
+          f('Der Regen hatte aufgehört, als ', ' den Wagen vor der alten Mühle abstellte…', 2),
+          f('…drückte mit der Schulter dagegen. ', ' strich mit den Fingern über den rauen Stoff…', 4),
+          f('…sah sie zum ersten Mal die Gravur. ', ' klappte sie auf und wieder zu…', 5)] },
+        { kapitel: kapitel[1], anzahl: 2, tab: '', treffer: [
+          f('„Jonas Weber“, sagte er. ', ' erinnerte sich vage an einen schlaksigen Jungen…', 31),
+          f('…fiel sein Blick auf die Taschenuhr, die ', ' auf den Tisch gelegt hatte.', 36)] }
+      ];
+    },
     bwHervorheben: function (b) { return b.length * 4; },
     bwHervorhebungEntfernen: function () { return 3; },
     bwBlaetterSync: function (liste) { var r = {}; liste.forEach(function (b) { r[b.id] = 'blatt-' + b.id; }); return r; },

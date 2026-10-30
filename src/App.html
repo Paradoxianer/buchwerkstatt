@@ -1238,8 +1238,35 @@
     var gesamt = liste.reduce(function (s, k) { return s + k.anzahl; }, 0);
     return info(th(liste.length === 1 ? 'karte.vorkommen1' : 'karte.vorkommenN', { n: gesamt, k: liste.length })) +
       liste.map(function (k, i) {
-        return '<div class="bez"><button class="stelle" style="max-width:none" data-aktion="zu-absatz" data-i="' + i + '">📖 ' + h(k.kapitel || t('anfang')) + '</button><span class="art-text" style="margin-left:auto">' + k.anzahl + '×</span></div>';
+        var offen = !!S.vorkommen.offen[i];
+        var aktiv = S.vorkommen.aktiv[i];
+        var html = '<div class="bez fund-kapitel">' +
+          '<button class="fund-auf" data-aktion="vorkommen-auf" data-i="' + i + '" aria-expanded="' + offen + '" title="' + th(offen ? 'karte.fund.zu' : 'karte.fund.auf') + '">' +
+          '<span class="pfeil">' + (offen ? '▾' : '▸') + '</span>📖 ' + h(k.kapitel || t('anfang')) + '</button>' +
+          '<button class="stelle fund-weiter" data-aktion="vorkommen-weiter" data-i="' + i + '" title="' + th('karte.fund.weiter') + '">' +
+          (aktiv == null ? k.anzahl + '×' : (aktiv + 1) + '/' + k.treffer.length) + ' ›</button></div>';
+        if (offen) {
+          html += '<div class="fund-liste">' + k.treffer.map(function (f, j) {
+            return '<button class="fund' + (aktiv === j ? ' aktiv' : '') + '" data-aktion="zu-fund" data-i="' + i + '" data-j="' + j + '">' +
+              h(f.vor) + '<b>' + h(f.wort) + '</b>' + h(f.nach) + '</button>';
+          }).join('') +
+          (k.anzahl > k.treffer.length ? '<div class="unter">' + th('karte.fund.weitere', { n: k.anzahl - k.treffer.length }) + '</div>' : '') +
+          '</div>';
+        }
+        return html;
       }).join('');
+  }
+
+  /** Springt zur Fundstelle j im Kapitel i und markiert das Wort im Manuskript. */
+  function zuFund(i, j) {
+    var v = S.vorkommen;
+    var k = v.liste[i], f = k.treffer[j];
+    if (!f) return;
+    v.aktiv[i] = j;
+    render();
+    sichere('bwZuFundstelle', k.tab, f.absatz, f.wort, f.nr).then(function (ok) {
+      if (!ok) toast(t('karte.fund.geaendert'));
+    });
   }
 
   /* -------------------------------------------------------------- */
@@ -1541,7 +1568,7 @@
     render();
     var begriffe = Object.keys(D.index.namen).filter(function (n) { return D.index.namen[n].ids.indexOf(e.id) >= 0; });
     sichere('bwVorkommen', begriffe).then(function (liste) {
-      S.vorkommen = { id: e.id, liste: liste };
+      S.vorkommen = { id: e.id, liste: liste, offen: liste.length === 1 ? { 0: true } : {}, aktiv: {} };
       if (S.karteId === e.id) render();
     }, function () { S.vorkommen = null; render(); });
   }
@@ -1911,7 +1938,13 @@
     'ki-uebernehmen': kiUebernehmen,
     'ki-zu': function () { S.kiVorschlag = S.kiBefunde = null; render(); },
     'vorkommen': vorkommen,
-    'zu-absatz': function (b) { var k = S.vorkommen.liste[Number(b.dataset.i)]; sichere('bwZuAbsatz', k.tab, k.index); },
+    'vorkommen-auf': function (b) { var i = Number(b.dataset.i); S.vorkommen.offen[i] = !S.vorkommen.offen[i]; render(); },
+    'vorkommen-weiter': function (b) {
+      // Jeder Klick: nächste Fundstelle im Kapitel, nach der letzten wieder die erste.
+      var i = Number(b.dataset.i), a = S.vorkommen.aktiv[i];
+      zuFund(i, a == null ? 0 : (a + 1) % S.vorkommen.liste[i].treffer.length);
+    },
+    'zu-fund': function (b) { zuFund(Number(b.dataset.i), Number(b.dataset.j)); },
     'notiz-zu': function () {
       var e = eintrag(S.karteId);
       geheZu('notizen');

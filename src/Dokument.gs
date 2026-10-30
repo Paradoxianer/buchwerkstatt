@@ -175,17 +175,17 @@ function ankerEntfernen_(anker) {
 }
 
 /**
- * In welchen Kapiteln kommt eine Karte vor?
- * begriffe: Namen und „Auch genannt“. Ergebnis: [{kapitel, anzahl, tab, index}]
- * index = erster Absatz im Kapitel mit Treffer (zum Hinspringen).
+ * Wo kommt eine Karte vor?
+ * begriffe: Namen und „Auch genannt“.
+ * Ergebnis: [{kapitel, anzahl, tab, treffer: [{absatz, wort, nr, vor, nach}]}]
+ * absatz = Index im Textkörper, nr = das wievielte „wort“ im Absatz (zum Hinspringen),
+ * vor/nach = etwas Text drumherum. Je Kapitel höchstens BW_FUND_MAX Treffer mit Text.
  */
+var BW_FUND_MAX = 60;
+
 function bwVorkommen(begriffe) {
-  var liste = begriffe.filter(function (b) { return b && b.length > 1; })
-    .sort(function (a, b) { return b.length - a.length; })
-    .map(function (b) { return b.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); });
-  if (!liste.length) return [];
-  // Name als ganzes Wort, auch im Genitiv („Lenas“).
-  var muster = new RegExp('(?<![\\p{L}\\p{N}_])(?:' + liste.join('|') + ')(?=s?(?![\\p{L}\\p{N}_]))', 'gu');
+  var muster = namensmuster_(begriffe);
+  if (!muster) return [];
   var doc = DocumentApp.getActiveDocument();
   var ergebnis = [];
   tabsOderDokument_(doc).forEach(function (t) {
@@ -195,22 +195,76 @@ function bwVorkommen(begriffe) {
       var kind = body.getChild(i);
       if (istKapitel_(kind) || !aktuell) {
         var titel = istKapitel_(kind) ? kind.asParagraph().getText().trim() : '';
-        aktuell = { kapitel: titel, anzahl: 0, tab: t ? t.getId() : '', index: -1 };
+        aktuell = { kapitel: titel, anzahl: 0, tab: t ? t.getId() : '', treffer: [] };
         ergebnis.push(aktuell);
         if (istKapitel_(kind)) continue;
       }
-      var text = kind.getText ? kind.getText() : '';
-      var treffer = text.match(muster);
-      if (treffer) {
-        if (aktuell.index < 0) aktuell.index = i;
-        aktuell.anzahl += treffer.length;
-      }
+      fundstellen_(kind.getText ? kind.getText() : '', muster).forEach(function (f) {
+        aktuell.anzahl++;
+        if (aktuell.treffer.length >= BW_FUND_MAX) return;
+        f.absatz = i;
+        aktuell.treffer.push(f);
+      });
     }
   });
   return ergebnis.filter(function (k) { return k.anzahl > 0; });
 }
 
-/** Setzt den Cursor an den Anfang eines Absatzes (für „Wo kommt X vor?“). */
+/** Name als ganzes Wort, auch im Genitiv („Lenas“); längere Namen zuerst. */
+function namensmuster_(begriffe) {
+  var liste = begriffe.filter(function (b) { return b && b.length > 1; })
+    .sort(function (a, b) { return b.length - a.length; })
+    .map(function (b) { return b.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); });
+  if (!liste.length) return null;
+  return new RegExp('(?<![\\p{L}\\p{N}_])(?:' + liste.join('|') + ')(?=s?(?![\\p{L}\\p{N}_]))', 'gu');
+}
+
+/** Alle Treffer in einem Absatz, mit etwas Text davor und danach (an Wortgrenzen gekürzt). */
+function fundstellen_(text, muster) {
+  var funde = [];
+  var rand = 45;
+  var glatt = function (s) { return s.replace(/\s+/g, ' '); };
+  muster.lastIndex = 0;
+  var m;
+  while ((m = muster.exec(text))) {
+    var ende = m.index + m[0].length;
+    var vor = text.slice(Math.max(0, m.index - rand), m.index);
+    var nach = text.slice(ende, ende + rand);
+    if (m.index > rand) vor = '…' + vor.replace(/^\S*\s/, '');
+    if (ende + rand < text.length) nach = nach.replace(/\s\S*$/, '') + '…';
+    funde.push({ wort: m[0], nr: text.slice(0, m.index).split(m[0]).length - 1, vor: glatt(vor), nach: glatt(nach) });
+  }
+  return funde;
+}
+
+/**
+ * Markiert eine Fundstelle aus bwVorkommen: das nr-te „wort“ im Absatz.
+ * Hat sich der Text seitdem geändert, landet der Cursor am Anfang des Absatzes (Ergebnis false).
+ */
+function bwZuFundstelle(tabId, absatz, wort, nr) {
+  var doc = DocumentApp.getActiveDocument();
+  var tab = tabId ? tabMitId_(doc, tabId) : null;
+  if (tab) {
+    try { doc.setActiveTab(tab.getId()); } catch (err) { /* ohne Tabs */ }
+  }
+  var inhalt = inhalt_(doc, tab);
+  var body = inhalt.getBody();
+  if (absatz >= body.getNumChildren()) return false;
+  var el = body.getChild(absatz);
+  var muster = String(wort).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  var treffer = el.findText ? el.findText(muster) : null;
+  for (var k = 0; treffer && k < nr; k++) treffer = el.findText(muster, treffer);
+  if (!treffer) {
+    bwZuAbsatz(tabId, absatz);
+    return false;
+  }
+  var bereich = inhalt.newRange ? inhalt.newRange() : doc.newRange();
+  bereich.addElement(treffer.getElement().asText(), treffer.getStartOffset(), treffer.getEndOffsetInclusive());
+  doc.setSelection(bereich.build());
+  return true;
+}
+
+/** Setzt den Cursor an den Anfang eines Absatzes. */
 function bwZuAbsatz(tabId, index) {
   var doc = DocumentApp.getActiveDocument();
   var tab = tabId ? tabMitId_(doc, tabId) : null;
