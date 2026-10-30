@@ -16,6 +16,7 @@ function bwBlaetterSync(blaetter) {
   var ss = datenbank_();
   var sheet = blatt_(ss, BW_EINTRAG);
   var eintraege = liesTabelle_(sheet, BW_EINTRAG);
+  var bilder = bilderLesen_(ss);
   var blattVon = {};
   eintraege.forEach(function (e) { if (e.blatt) blattVon[e.id] = e.blatt; });
 
@@ -50,7 +51,7 @@ function bwBlaetterSync(blaetter) {
   var fehler = [];
   blaetter.forEach(function (b) {
     try {
-      schreibeBlatt_(blattVon[b.id], b, blattVon);
+      schreibeBlatt_(blattVon[b.id], b, blattVon, bilder[b.id]);
     } catch (err) {
       console.error('Personenblatt „' + b.titel + '“: ' + (err && err.stack || err));
       fehler.push(b.titel + ': ' + (err && err.message || err));
@@ -77,7 +78,7 @@ function dokumentDa_(id) {
   }
 }
 
-function schreibeBlatt_(docId, b, blattVon) {
+function schreibeBlatt_(docId, b, blattVon, bild) {
   var doc = DocumentApp.openById(docId);
   var body = doc.getBody();
   body.clear();
@@ -87,6 +88,14 @@ function schreibeBlatt_(docId, b, blattVon) {
   titel.setText(b.titel || '');
   titel.setHeading(DocumentApp.ParagraphHeading.TITLE);
   if (b.untertitel) absatz_(body, b.untertitel, DocumentApp.ParagraphHeading.SUBTITLE);
+  var blob = bildBlob_(bild);
+  if (blob) {
+    var bildAbsatz = absatz_(body, '', DocumentApp.ParagraphHeading.NORMAL);
+    var grafik = bildAbsatz.appendInlineImage(blob);
+    var breite = 180;
+    grafik.setHeight(Math.round(grafik.getHeight() * breite / grafik.getWidth()));
+    grafik.setWidth(breite);
+  }
   (b.abschnitte || []).forEach(function (a) {
     if (!a.zeilen || !a.zeilen.length) return;
     if (a.titel) absatz_(body, a.titel, DocumentApp.ParagraphHeading.HEADING2);

@@ -59,6 +59,8 @@
   db.einstellungen = JSON.parse(JSON.stringify(STANDARD));
   db.einstellungen.arten = standardArten[kontoSprache];
   if (location.hash.indexOf('ki') >= 0) db.ki = true;
+  if (location.hash.indexOf('gemini') >= 0) { db.ki = true; db.kiAnbieter = 'google'; }
+  db.bilder = {};
   if (location.hash.indexOf('leer') >= 0) {
     db.eintraege = [];
     db.beziehungen = [];
@@ -67,7 +69,7 @@
   var server = {
     bwLaden: function () {
       return { buch: 'Die Taschenuhr (Roman)', tabelleUrl: '#', ordnerUrl: '#', kontoSprache: kontoSprache, version: { nummer: '0.2.0', stand: '2026-10-30 10:52', commit: '2a1db94' },
-        standardArten: standardArten, kurzeArten: kurzeArten, einstellungen: db.einstellungen, eintraege: db.eintraege, beziehungen: db.beziehungen, ki: { aktiv: db.ki, ende: db.ki ? 'abcd' : '' } };
+        standardArten: standardArten, kurzeArten: kurzeArten, einstellungen: db.einstellungen, eintraege: db.eintraege, beziehungen: db.beziehungen, bilder: db.bilder, ki: { aktiv: db.ki, ende: db.ki ? 'abcd' : '', anbieter: db.kiAnbieter } };
     },
     bwSpeichern: function (e, opt) {
       var neu = !e.id || e.id.indexOf('tmp') === 0;
@@ -125,6 +127,23 @@
         verlauf.push({ datum: d, geschrieben: [320, 610, 0, 540, 800, 120, 505, 0, 450, 700, 520, 610, 90, 260][13 - i], gesamt: 41000 });
       }
       return { gesamt: 41230, heute: 260, verlauf: verlauf };
+    },
+    bwBildSetzen: function (id, bild) { db.bilder[id] = bild.klein; return { bild: bild.klein, datei: 'datei-' + id }; },
+    bwBildEntfernen: function (id) { delete db.bilder[id]; return true; },
+    bwKiBild: function (anfrage) {
+      // Attrappe: ein gemaltes Platzhalter-Porträt
+      var c = document.createElement('canvas');
+      c.width = c.height = 512;
+      var g = c.getContext('2d');
+      var verlauf = g.createLinearGradient(0, 0, 512, 512);
+      verlauf.addColorStop(0, anfrage.stil === 'skizze' ? '#eee' : '#f6d6b8');
+      verlauf.addColorStop(1, anfrage.stil === 'skizze' ? '#bbb' : '#8fb3e8');
+      g.fillStyle = verlauf; g.fillRect(0, 0, 512, 512);
+      g.fillStyle = anfrage.stil === 'skizze' ? '#555' : '#c0392b';
+      g.beginPath(); g.arc(256, 210, 110, 0, 7); g.fill();
+      g.fillStyle = '#f1c9a5'; g.beginPath(); g.arc(256, 230, 80, 0, 7); g.fill();
+      g.fillStyle = '#34495e'; g.beginPath(); g.ellipse(256, 470, 170, 140, 0, 0, 7); g.fill();
+      return { daten: c.toDataURL('image/png').split(',')[1], mime: 'image/png' };
     },
     bwKiStatus: function () { return { aktiv: db.ki, ende: 'abcd', anbieter: db.kiAnbieter }; },
     bwKiSchluesselSetzen: function (k) {

@@ -65,7 +65,12 @@ function welt() {
     const p = {
       // Wie in Apps Script: setText gibt nichts zurück (nicht verkettbar).
       setText(t) { a.text = t; }, setHeading(h) { a.heading = h; return p; },
-      editAsText() { return textObj(a); }
+      editAsText() { return textObj(a); },
+      appendInlineImage(blob) {
+        a.bild = blob;
+        const g = { b: 256, h: 256, getWidth: () => g.b, getHeight: () => g.h, setWidth(x) { g.b = x; return g; }, setHeight(x) { g.h = x; return g; } };
+        return g;
+      }
     };
     return p;
   }
@@ -144,13 +149,17 @@ function welt() {
     Drive, DocumentApp, SpreadsheetApp,
     PropertiesService: { getDocumentProperties: () => dokProps, getUserProperties: () => nutzerProps },
     Session: { getActiveUserLocale: () => 'de', getScriptTimeZone: () => 'Europe/Berlin' },
-    Utilities: { formatDate: (d) => d.toISOString().slice(0, 16).replace('T', ' '), getUuid: () => 'uuid-' + (++zaehler) + '-xxxxxxxx' },
+    Utilities: {
+      newBlob: (bytes, mime, name) => ({ bytes, mime, getName: () => name }),
+      base64Decode: (x) => Buffer.from(x, 'base64'),
+      formatDate: (d) => d.toISOString().slice(0, 16).replace('T', ' '), getUuid: () => 'uuid-' + (++zaehler) + '-xxxxxxxx'
+    },
     LockService: { getDocumentLock: () => ({ waitLock() {}, releaseLock() {} }) },
     UrlFetchApp: {}, HtmlService: {},
     CacheService: { getDocumentCache: () => cache }
   };
   const namen = Object.keys(globals);
-  const fns = new Function(...namen, code + '; return { bwSpeichern, bwBlaetterSync, bwLoeschen, bwLaden, datenbank_, bwFelderSetzen, bwEintraegeLesen, bwEinstellungenSpeichern, bwObenSetzen, bwTabelleNeuAnlegen, einstellungen_, fragebogen_, kurzeFelder_, neueAusfuehrung: function () { bwCacheDb_ = null; bwCacheSprache_ = null; } };')(...namen.map((n) => globals[n]));
+  const fns = new Function(...namen, code + '; return { bwSpeichern, bwBlaetterSync, bwLoeschen, bwLaden, datenbank_, bwFelderSetzen, bwEintraegeLesen, bwEinstellungenSpeichern, bwObenSetzen, bwTabelleNeuAnlegen, bwBildSetzen, bwBildEntfernen, einstellungen_, fragebogen_, kurzeFelder_, neueAusfuehrung: function () { bwCacheDb_ = null; bwCacheSprache_ = null; } };')(...namen.map((n) => globals[n]));
   return { fns, dateien, docs, dokProps, zugriff, tabellen };
 }
 
@@ -302,4 +311,26 @@ test('Personenblätter beim gemeinsamen Schreiben: fremdes Blatt weiterverwenden
   assert.equal(fns.bwBlaetterSync([blatt('Lena Berger')])[lena.id], id, 'dasselbe Blatt');
   assert.equal(Object.keys(dateien).length, anzahl, 'kein neues Dokument');
   assert.equal(dateien[id].name, 'Lena Berger', 'umbenannt');
+});
+
+test('Bilder: speichern, ersetzen, im Personenblatt, beim Löschen weg', () => {
+  const { fns, dateien, docs } = welt();
+  const lena = fns.bwSpeichern({ art: 'person', name: 'Lena', text: '', felder: {} }, {});
+  const klein = 'data:image/jpeg;base64,' + Buffer.from('klein').toString('base64');
+  const r1 = fns.bwBildSetzen(lena.id, { klein, gross: Buffer.from('gross').toString('base64'), name: 'Lena' });
+  assert.equal(dateien[r1.datei].name, 'Lena.jpg');
+  assert.deepEqual(fns.bwLaden().bilder, { [lena.id]: klein });
+  // Normales Speichern der Karte lässt das Bild in Ruhe
+  fns.bwSpeichern(Object.assign({}, lena, { text: 'Hebamme' }), {});
+  assert.deepEqual(fns.bwLaden().bilder, { [lena.id]: klein });
+  // Ersetzen: altes Original in den Papierkorb
+  const r2 = fns.bwBildSetzen(lena.id, { klein, gross: Buffer.from('neu').toString('base64'), name: 'Lena' });
+  assert.equal(dateien[r1.datei].trashed, true);
+  // Im Personenblatt steht das Bild unter dem Titel
+  const blatt = fns.bwBlaetterSync([{ id: lena.id, titel: 'Lena', abschnitte: [] }])[lena.id];
+  assert.ok(docs[blatt].some((a) => a.bild), 'Bild im Blatt');
+  assert.throws(() => fns.bwBildSetzen(lena.id, { klein: 'data:image/jpeg;base64,' + 'A'.repeat(60000) }), /zu groß/);
+  fns.bwLoeschen(lena.id);
+  assert.equal(dateien[r2.datei].trashed, true, 'Bild beim Löschen der Karte im Papierkorb');
+  assert.deepEqual(fns.bwLaden().bilder, {});
 });

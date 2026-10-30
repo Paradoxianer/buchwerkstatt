@@ -83,7 +83,9 @@ BWFenster.registriere('steckbrief', (function () {
 
   function render() {
     var html = '<div class="sb" style="--c:' + a.farbe + ';--hell:' + a.hell + '">' +
-      '<header class="sb-kopf"><span class="avatar">' + initialen(e.name) + '</span>' +
+      '<header class="sb-kopf">' + ((F.daten.bilder || {})[e.id]
+        ? '<span class="avatar mit-bild"><img src="' + h(F.daten.bilder[e.id]) + '" alt=""></span>'
+        : '<span class="avatar">' + initialen(e.name) + '</span>') +
       '<div class="sb-titel"><div class="karte-art">' + a.icon + ' ' + h(a.name) + '</div><h1>' + h(e.name) + '</h1></div>' +
       '<div class="sb-fortschritt" id="sb-gesamt"></div>' +
       '<span class="kopf-status" id="fenster-status"></span>' +

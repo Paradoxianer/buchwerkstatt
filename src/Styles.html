@@ -139,6 +139,18 @@
   /* Karte */
   .karte-kopf { display: flex; align-items: flex-start; gap: 10px; margin: 6px 0 10px; }
   .karte-kopf .avatar { width: 42px; height: 42px; font-size: 18px; }
+  .avatar.mit-bild { background: none; }
+  .spot-icon.mit-bild { background: none; padding: 0; overflow: hidden; }
+  .spot-icon img { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 50%; }
+  .avatar img { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 50%; }
+  button.avatar { border: 0; padding: 0; cursor: pointer; position: relative; font-family: inherit; }
+  .karte-kopf .avatar { width: 52px; height: 52px; }
+  .avatar-kamera { position: absolute; right: -3px; bottom: -3px; font-size: 13px; background: var(--flaeche); border-radius: 50%; width: 21px; height: 21px; display: grid; place-items: center; box-shadow: var(--schatten); opacity: 0; transition: opacity .15s; }
+  button.avatar:hover .avatar-kamera, button.avatar:focus-visible .avatar-kamera, button.avatar:not(.mit-bild) .avatar-kamera { opacity: 1; }
+  .bild-hinweis { width: 100%; margin-top: 8px; border: 1px solid var(--linie); border-radius: 6px; padding: 5px 7px; outline: 0; font: inherit; }
+  .bild-vorschau { margin-top: 8px; text-align: center; color: var(--text-2); }
+  .bild-vorschau img { width: 100%; max-width: 260px; border-radius: 10px; box-shadow: var(--schatten); }
+  .bild-vorschau .kreisel { margin: 18px auto 6px; }
   .karte-name { font-size: 17px; font-weight: 600; border: 0; background: none; padding: 0; width: 100%; outline: 0; border-bottom: 1px solid transparent; }
   .karte-name:hover, .karte-name:focus { border-bottom-color: var(--linie); }
   .karte-art { font-size: 11px; color: var(--c); font-weight: 600; }

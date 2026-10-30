@@ -89,6 +89,7 @@ function bwLaden() {
     einstellungen: einstellungen_(),
     eintraege: liesTabelle_(blatt_(ss, BW_EINTRAG), BW_EINTRAG).map(eintragAusZeile_),
     beziehungen: liesTabelle_(blatt_(ss, BW_BEZIEHUNG), BW_BEZIEHUNG),
+    bilder: bilderLesen_(ss),
     ki: bwKiStatus()
   };
 }
@@ -157,6 +158,7 @@ function bwLoeschen(id) {
       dateiInPapierkorb_(alt.blatt);
     }
     loescheZeile_(sheet, BW_EINTRAG, id);
+    bildLoeschen_(ss, id);
     var bez = blatt_(ss, BW_BEZIEHUNG);
     liesTabelle_(bez, BW_BEZIEHUNG).forEach(function (b) {
       if (b.von === id || b.nach === id) loescheZeile_(bez, BW_BEZIEHUNG, b.id);

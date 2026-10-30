@@ -223,3 +223,71 @@ function kiGoogle_(key, system, prompt, schema) {
   if (!text) throw new Error('✨ ' + tx_('kiAbgelehnt'));
   return JSON.parse(text);
 }
+
+/*
+ * Bilder erzeugen (nur Gemini – Claude erzeugt keine Bilder).
+ * anfrage = { artId, art, name, felder: {Aussehen: '…', …}, text, stil: 'illustration'|'foto'|'skizze', hinweis }
+ * Antwort  = { daten: Base64, mime }
+ */
+var BW_KI_BILD_MODELLE = ['gemini-3.1-flash-image', 'gemini-2.5-flash-image'];
+var BW_KI_BILD_STILE = {
+  illustration: 'Painterly digital illustration with soft, warm light, like a book illustration.',
+  foto: 'Photorealistic portrait photograph, natural light, shallow depth of field.',
+  skizze: 'Expressive pencil sketch, graphite on paper, no colour.'
+};
+
+function bwKiBild(anfrage) {
+  var key = PropertiesService.getUserProperties().getProperty(BW_PROP_KI);
+  if (!key) throw new Error(tx_('kiKeinSchluessel'));
+  if (kiAnbieter_(key) !== 'google') throw new Error('✨ ' + tx_('kiBildNurGemini'));
+
+  var kurz = function (x, n) { x = String(x || '').trim(); return x.length > n ? x.slice(0, n) + '…' : x; };
+  var notizen = Object.keys(anfrage.felder || {})
+    .filter(function (k) { return String(anfrage.felder[k] || '').trim(); })
+    .map(function (k) { return '- ' + k + ': ' + kurz(anfrage.felder[k], 300); })
+    .join('\n');
+  var motiv = anfrage.artId === 'person'
+    ? 'A head-and-shoulders portrait of the fictional character "' + anfrage.name + '".'
+    : 'An illustration of "' + anfrage.name + '" (' + anfrage.art + ') from a novel.';
+  var prompt = motiv + '\n' +
+    (BW_KI_BILD_STILE[anfrage.stil] || BW_KI_BILD_STILE.illustration) + '\n' +
+    'Square image, calm neutral background. No text, no lettering, no frame, no watermark.\n' +
+    'Use the author\'s notes below (they may be in another language). Focus on what shows: ' +
+    'age, appearance, face, hair, clothing, posture, mood. Ignore everything that cannot be seen. ' +
+    'Where the notes say nothing, choose something plausible and unobtrusive.\n\n' +
+    'Notes:\n' + (notizen || '(none)') +
+    (anfrage.text ? '\n\nDescription:\n' + kurz(anfrage.text, 1200) : '') +
+    (anfrage.hinweis ? '\n\nThe author especially wants: ' + kurz(anfrage.hinweis, 400) : '');
+
+  var body = {
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    generationConfig: { responseModalities: ['IMAGE'], imageConfig: { aspectRatio: '1:1' } }
+  };
+  var antwort = null, code = 0;
+  // Ist das neuere Modell (noch) nicht verfügbar, das ältere nehmen.
+  for (var i = 0; i < BW_KI_BILD_MODELLE.length; i++) {
+    antwort = UrlFetchApp.fetch(BW_KI_URL_GOOGLE + BW_KI_BILD_MODELLE[i] + ':generateContent', {
+      method: 'post',
+      contentType: 'application/json',
+      headers: { 'x-goog-api-key': key },
+      payload: JSON.stringify(body),
+      muteHttpExceptions: true
+    });
+    code = antwort.getResponseCode();
+    if (code !== 404) break;
+  }
+  var daten = {};
+  try { daten = JSON.parse(antwort.getContentText()); } catch (err) { daten = {}; }
+  if (code !== 200) {
+    var fehler = daten.error || {};
+    var meldung = fehler.message || 'HTTP ' + code;
+    if (code === 401 || code === 403 || /API_KEY_INVALID|API key not valid/i.test(JSON.stringify(fehler))) meldung = tx_('ki401');
+    else if (code === 429 || code === 503) meldung = tx_('kiAusgelastet');
+    throw new Error('✨ ' + meldung);
+  }
+  if (daten.promptFeedback && daten.promptFeedback.blockReason) throw new Error('✨ ' + tx_('kiAbgelehnt'));
+  var teile = (((daten.candidates || [])[0] || {}).content || {}).parts || [];
+  var bild = teile.filter(function (p) { return p.inlineData && p.inlineData.data; })[0];
+  if (!bild) throw new Error('✨ ' + tx_('kiAbgelehnt'));
+  return { daten: bild.inlineData.data, mime: bild.inlineData.mimeType || 'image/png' };
+}

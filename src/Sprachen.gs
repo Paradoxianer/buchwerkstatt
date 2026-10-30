@@ -23,6 +23,8 @@ var BW_TEXTE = {
     kiAusgelastet: 'Die KI ist gerade ausgelastet. Bitte gleich noch einmal versuchen.',
     kiAbgelehnt: 'Die Anfrage wurde abgelehnt.',
     kiZuLang: 'Die Antwort war zu lang. Bitte mit weniger Text versuchen.',
+    bildZuGross: 'Das Bild ist zu groß. Bitte ein kleineres versuchen.',
+    kiBildNurGemini: 'Bilder erzeugen kann nur Gemini. Dafür unter Mehr → KI-Hilfe einen Gemini-Schlüssel eintragen.',
     keinZugriff: 'Kein Zugriff auf die Tabelle dieses Buchs. Sie gehört wohl jemand anderem. Bitte den Ordner „{ordner}“ in Google Drive für dich freigeben lassen (Bearbeiten) und dann neu laden.'
   },
   en: {
@@ -37,6 +39,8 @@ var BW_TEXTE = {
     kiAusgelastet: 'The AI is busy right now. Please try again in a moment.',
     kiAbgelehnt: 'The request was declined.',
     kiZuLang: 'The answer was too long. Please try with less text.',
+    bildZuGross: 'The image is too large. Please try a smaller one.',
+    kiBildNurGemini: 'Only Gemini can create images. Enter a Gemini key under More → AI help.',
     keinZugriff: 'No access to this book’s spreadsheet – it probably belongs to someone else. Please ask them to share the folder “{ordner}” in Google Drive with you (Editor), then reload.'
   },
   fr: {
@@ -51,6 +55,8 @@ var BW_TEXTE = {
     kiAusgelastet: 'L’IA est très sollicitée en ce moment. Veuillez réessayer dans un instant.',
     kiAbgelehnt: 'La demande a été refusée.',
     kiZuLang: 'La réponse était trop longue. Veuillez réessayer avec moins de texte.',
+    bildZuGross: 'L’image est trop grande. Essaie-en une plus petite.',
+    kiBildNurGemini: 'Seul Gemini peut créer des images. Saisis une clé Gemini sous Plus → Aide IA.',
     keinZugriff: 'Pas d’accès au tableur de ce livre – il appartient sans doute à quelqu’un d’autre. Demande-lui de partager avec toi le dossier « {ordner} » dans Google Drive (Éditeur), puis recharge.'
   },
   es: {
@@ -65,6 +71,8 @@ var BW_TEXTE = {
     kiAusgelastet: 'La IA está saturada en este momento. Inténtalo de nuevo en un momento.',
     kiAbgelehnt: 'La solicitud fue rechazada.',
     kiZuLang: 'La respuesta fue demasiado larga. Inténtalo con menos texto.',
+    bildZuGross: 'La imagen es demasiado grande. Prueba con una más pequeña.',
+    kiBildNurGemini: 'Solo Gemini puede crear imágenes. Introduce una clave de Gemini en Más → Ayuda de IA.',
     keinZugriff: 'No tienes acceso a la hoja de cálculo de este libro; seguramente pertenece a otra persona. Pídele que comparta contigo la carpeta «{ordner}» en Google Drive (Editor) y vuelve a cargar.'
   },
   it: {
@@ -79,6 +87,8 @@ var BW_TEXTE = {
     kiAusgelastet: 'L’IA è occupata in questo momento. Riprova tra poco.',
     kiAbgelehnt: 'La richiesta è stata rifiutata.',
     kiZuLang: 'La risposta era troppo lunga. Riprova con meno testo.',
+    bildZuGross: 'L’immagine è troppo grande. Provane una più piccola.',
+    kiBildNurGemini: 'Solo Gemini può creare immagini. Inserisci una chiave Gemini in Altro → Aiuto IA.',
     keinZugriff: 'Nessun accesso al foglio di questo libro: probabilmente appartiene a qualcun altro. Chiedi di condividere con te la cartella «{ordner}» in Google Drive (Editor), poi ricarica.'
   },
   pt: {
@@ -93,6 +103,8 @@ var BW_TEXTE = {
     kiAusgelastet: 'A IA está sobrecarregada agora. Tente novamente em instantes.',
     kiAbgelehnt: 'O pedido foi recusado.',
     kiZuLang: 'A resposta foi longa demais. Tente com menos texto.',
+    bildZuGross: 'A imagem é demasiado grande. Experimenta uma mais pequena.',
+    kiBildNurGemini: 'Só o Gemini consegue criar imagens. Introduz uma chave Gemini em Mais → Ajuda de IA.',
     keinZugriff: 'Sem acesso à folha de cálculo deste livro – provavelmente pertence a outra pessoa. Pede que partilhem contigo a pasta «{ordner}» no Google Drive (Editor) e volta a carregar.'
   },
   nl: {
@@ -107,6 +119,8 @@ var BW_TEXTE = {
     kiAusgelastet: 'De AI is op dit moment druk. Probeer het zo meteen opnieuw.',
     kiAbgelehnt: 'Het verzoek is geweigerd.',
     kiZuLang: 'Het antwoord was te lang. Probeer het met minder tekst.',
+    bildZuGross: 'De afbeelding is te groot. Probeer een kleinere.',
+    kiBildNurGemini: 'Alleen Gemini kan afbeeldingen maken. Vul een Gemini-sleutel in onder Meer → AI-hulp.',
     keinZugriff: 'Geen toegang tot de spreadsheet van dit boek – die is waarschijnlijk van iemand anders. Vraag of de map ‘{ordner}’ in Google Drive met je gedeeld wordt (Bewerker) en laad daarna opnieuw.'
   }
 };

@@ -18,7 +18,7 @@
   function th(schluessel, werte) { return h(t(schluessel, werte)); }
 
   var S = {
-    buch: '', tabelleUrl: '', ordnerUrl: '', kontoSprache: '', standardArten: {}, kurzeArten: {},
+    buch: '', tabelleUrl: '', ordnerUrl: '', kontoSprache: '', standardArten: {}, kurzeArten: {}, bilder: {}, bildKi: null,
     einst: null, eintraege: [], beziehungen: [], ki: { aktiv: false },
     cursor: null, textstellen: {}, stat: null,
     ansicht: 'notizen', karteId: null, verlauf: [],
@@ -112,6 +112,12 @@
   }
 
   function stilFarbe(a) { return '--c:' + a.farbe + ';--hell:' + a.hell; }
+
+  /** Bild der Karte, sonst die Initialen. */
+  function avatarHtml(e) {
+    var bild = S.bilder[e.id];
+    return bild ? '<img src="' + h(bild) + '" alt="">' : initialen(e.name);
+  }
 
   function textHtml(text) { return C.textMitVerweisen(text, D.index, D.eintragVon, D.artVon); }
 
@@ -1029,7 +1035,7 @@
     var info = felder.length ? felder.slice(0, 3).join(' · ') : (e.text || (e.aliase || []).join(', '));
     var n = (D.graph.rein[e.id] || []).length;
     return '<button class="zeile" data-id="' + h(e.id) + '" style="' + stilFarbe(a) + '">' +
-      '<span class="avatar">' + initialen(e.name) + '</span>' +
+      '<span class="avatar' + (S.bilder[e.id] ? ' mit-bild' : '') + '">' + avatarHtml(e) + '</span>' +
       '<span class="zeile-text"><div class="zeile-name">' + h(e.name) + '</div>' +
       '<div class="zeile-info">' + h(C.ausschnitt(info, 80)) + '</div></span>' +
       (n ? '<span class="zahl" title="' + th('welt.erwaehnt') + '">' + n + '×</span>' : '') + '</button>';
@@ -1058,7 +1064,7 @@
     var html = '<div style="display:flex;align-items:center;position:relative">' +
       '<button class="zurueck" data-aktion="zurueck">' + th('karte.zurueck') + '</button><span style="flex:1"></span>' +
       '<span id="kopfmenue"></span><button class="mini" data-aktion="karten-menue" title="' + th('mehr') + '" style="font-size:16px">⋯</button></div>';
-    html += '<div class="karte-kopf" style="' + stilFarbe(a) + '"><span class="avatar">' + initialen(e.name) + '</span><div style="flex:1;min-width:0">' +
+    html += '<div class="karte-kopf" style="' + stilFarbe(a) + '"><button class="avatar' + (S.bilder[e.id] ? ' mit-bild' : '') + '" data-aktion="bild-menue" title="' + th('bild.titel') + '">' + avatarHtml(e) + '<span class="avatar-kamera">📷</span></button><div style="flex:1;min-width:0">' +
       '<div class="karte-art">' + a.icon + ' ' + h(a.name) + '</div>' +
       '<input class="karte-name" data-feld="name" value="' + h(e.name) + '" aria-label="' + th('karte.name') + '">' +
       '<input class="feld-alias" data-feld="aliase" value="' + h((e.aliase || []).join(', ')) + '" placeholder="' + th('karte.alias') + '" title="' + th('karte.alias.titel') + '">' +
@@ -1066,6 +1072,7 @@
 
     if (S.kiVorschlag && S.kiVorschlag.id === e.id) html += kiVorschlagHtml(e);
     if (S.kiBefunde && S.kiBefunde.id === e.id) html += kiBefundeHtml();
+    if (S.bildKi && S.bildKi.id === e.id) html += bildKiHtml(e);
 
     // Steckbrief – oben die Felder mit Stern, darunter die Bereiche zum Aufklappen
     var gruppen = C.steckbrief(a.felder, e.felder, t('karte.weitere'));
@@ -1233,6 +1240,125 @@
       liste.map(function (k, i) {
         return '<div class="bez"><button class="stelle" style="max-width:none" data-aktion="zu-absatz" data-i="' + i + '">📖 ' + h(k.kapitel || t('anfang')) + '</button><span class="art-text" style="margin-left:auto">' + k.anzahl + '×</span></div>';
       }).join('');
+  }
+
+  /* -------------------------------------------------------------- */
+  /* Bilder zu Karten: hochladen oder mit Gemini erzeugen            */
+  /* -------------------------------------------------------------- */
+
+  function bildOptionen(e) {
+    var o = [{ html: th('bild.hochladen'), tun: function () { bildWaehlen(e); } }];
+    if (kiSichtbar() && S.ki.anbieter === 'google') {
+      o.push({ html: th('bild.ki'), tun: function () {
+        S.bildKi = { id: e.id, stil: (S.bildKi && S.bildKi.stil) || 'illustration', hinweis: '' };
+        render();
+      } });
+    }
+    if (S.bilder[e.id]) o.push({ html: gefahr(t('bild.entfernen')), tun: function () { bildEntfernen(e); } });
+    return o;
+  }
+
+  function bildWaehlen(e) {
+    var input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = function () {
+      var datei = input.files && input.files[0];
+      if (!datei) return;
+      var leser = new FileReader();
+      leser.onload = function () { bildSpeichern(e.id, leser.result); };
+      leser.readAsDataURL(datei);
+    };
+    input.click();
+  }
+
+  /** Lädt ein Bild und liefert ein Canvas mit höchstens max Pixeln Kantenlänge (quadratisch = Mitte ausschneiden). */
+  function bildAufCanvas(src, max, quadratisch) {
+    return new Promise(function (ok, fehler) {
+      var img = new Image();
+      img.onload = function () {
+        var sx = 0, sy = 0, sb = img.naturalWidth, sh = img.naturalHeight;
+        if (quadratisch) {
+          var k = Math.min(sb, sh);
+          // Bei Hochformat eher oben ausschneiden – dort ist meist das Gesicht.
+          sx = (sb - k) / 2; sy = sh > sb ? (sh - k) * 0.2 : (sh - k) / 2; sb = sh = k;
+        }
+        var f = Math.min(1, max / Math.max(sb, sh));
+        var c = document.createElement('canvas');
+        c.width = Math.round(sb * f); c.height = Math.round(sh * f);
+        var g = c.getContext('2d');
+        g.fillStyle = '#fff';
+        g.fillRect(0, 0, c.width, c.height);
+        g.drawImage(img, sx, sy, sb, sh, 0, 0, c.width, c.height);
+        ok(c);
+      };
+      img.onerror = function () { fehler(new Error(t('bild.ungueltig'))); };
+      img.src = src;
+    });
+  }
+
+  function bildSpeichern(id, src) {
+    var e = eintrag(id);
+    if (!e) return;
+    var vorher = S.bilder[id];
+    Promise.all([bildAufCanvas(src, 256, true), bildAufCanvas(src, 1600, false)]).then(function (c) {
+      var klein = c[0].toDataURL('image/jpeg', 0.85);
+      // Eine Tabellenzelle fasst nur 50.000 Zeichen.
+      for (var q = 0.75; klein.length > 48000 && q > 0.3; q -= 0.15) klein = c[0].toDataURL('image/jpeg', q);
+      var gross = c[1].toDataURL('image/jpeg', 0.88).split(',')[1];
+      S.bilder[id] = klein;
+      render();
+      return sichere('bwBildSetzen', id, { klein: klein, gross: gross, name: e.name }).then(function () {
+        blaetterVormerken([id]);
+        toast(t('bild.gespeichert'));
+      }, function () {
+        if (vorher) S.bilder[id] = vorher; else delete S.bilder[id];
+        render();
+      });
+    }, function (err) { toast(fehlertext(err), { fehler: true }); });
+  }
+
+  function bildEntfernen(e) {
+    var vorher = S.bilder[e.id];
+    delete S.bilder[e.id];
+    render();
+    sichere('bwBildEntfernen', e.id).then(function () { blaetterVormerken([e.id]); }, function () { S.bilder[e.id] = vorher; render(); });
+  }
+
+  function bildErzeugen() {
+    var v = S.bildKi, e = eintrag(v.id);
+    if (!e || v.laeuft) return;
+    var hinweis = $('#bild-hinweis');
+    v.hinweis = hinweis ? hinweis.value.trim() : '';
+    v.laeuft = true;
+    render();
+    rufe('bwKiBild', { artId: e.art, art: art(e.art).name, name: e.name, felder: e.felder || {}, text: e.text, stil: v.stil, hinweis: v.hinweis })
+      .then(function (bild) {
+        v.laeuft = false;
+        v.vorschlag = bild;
+        if (S.bildKi === v) render();
+      }, function (err) {
+        v.laeuft = false;
+        if (S.bildKi === v) render();
+        toast(fehlertext(err), { fehler: true });
+      });
+  }
+
+  function bildKiHtml(e) {
+    var v = S.bildKi;
+    var stile = ['illustration', 'foto', 'skizze'].map(function (s) {
+      return '<button class="knopf klein' + (v.stil === s ? ' primaer' : '') + '" data-aktion="bild-stil" data-stil="' + s + '"' + (v.laeuft ? ' disabled' : '') + '>' + th('bild.stil.' + s) + '</button>';
+    }).join('');
+    return '<div class="vorschlag-box bild-ki"><h4>' + th('bild.ki.titel', { name: e.name }) + '</h4>' +
+      '<div class="ki-leiste" style="margin-top:0">' + stile + '</div>' +
+      '<input id="bild-hinweis" class="bild-hinweis" value="' + h(v.hinweis || '') + '" placeholder="' + th('bild.hinweis') + '"' + (v.laeuft ? ' disabled' : '') + '>' +
+      (v.laeuft ? '<div class="bild-vorschau"><div class="kreisel"></div><small>' + th('bild.malt') + '</small></div>'
+        : v.vorschlag ? '<div class="bild-vorschau"><img src="data:' + h(v.vorschlag.mime) + ';base64,' + v.vorschlag.daten + '" alt=""></div>' : '') +
+      '<div class="ki-leiste">' +
+      (v.vorschlag && !v.laeuft ? '<button class="knopf primaer klein" data-aktion="bild-nehmen">' + th('bild.nehmen') + '</button>' : '') +
+      '<button class="knopf ki klein" data-aktion="bild-erzeugen"' + (v.laeuft ? ' disabled' : '') + '>' + th(v.vorschlag ? 'bild.nochmal' : 'bild.erzeugen') + '</button>' +
+      '<button class="knopf klein" data-aktion="bild-ki-zu">' + th('abbrechen') + '</button></div>' +
+      '<div class="unter">' + th('bild.ki.info') + '</div></div>';
   }
 
   function kiVorschlagHtml(e) {
@@ -1721,7 +1847,7 @@
       var a = art(e.art);
       var felder = Object.keys(e.felder || {}).map(function (k) { return e.felder[k]; }).filter(Boolean);
       var info = felder.length ? felder.slice(0, 3).join(' · ') : C.ausschnitt(e.text, 80) || a.name;
-      el.innerHTML = '<span class="spot-icon" style="' + stilFarbe(a) + '">' + a.icon + '</span><span class="spot-text"><div class="spot-name">' + h(e.name) + '</div><div class="spot-info">' + h(info) + '</div></span><span class="spot-pfeil">›</span>';
+      el.innerHTML = '<span class="spot-icon' + (S.bilder[e.id] ? ' mit-bild' : '') + '" style="' + stilFarbe(a) + '">' + (S.bilder[e.id] ? avatarHtml(e) : a.icon) + '</span><span class="spot-text"><div class="spot-name">' + h(e.name) + '</div><div class="spot-info">' + h(info) + '</div></span><span class="spot-pfeil">›</span>';
       el.dataset.id = e.id;
       el.title = t('karte.oeffnen');
       el.hidden = false;
@@ -1799,6 +1925,7 @@
       var r = b.getBoundingClientRect();
       var optionen = [{ html: th('karte.menue.notiz', { name: e.name }), tun: AKTIONEN['notiz-zu'] }];
       if ((art(e.art).felder || []).length) optionen.push({ html: th('karte.ausfuehrlich'), tun: steckbriefFenster });
+      bildOptionen(e).forEach(function (o) { optionen.push(o); });
       if (e.blatt) optionen.push({ html: th('karte.menue.blattAuf'), tun: function () { window.open('https://docs.google.com/document/d/' + e.blatt + '/edit', '_blank'); } });
       else optionen.push({ html: th('karte.menue.blattNeu'), tun: function () { S.blaetterOffen[e.id] = true; blaetterSenden().then(function () { toast(t('karte.menue.blattFertig')); }); } });
       if (e.anker) optionen.push({ html: th('karte.menue.wo'), tun: function () { springe(e); } });
@@ -1852,6 +1979,24 @@
       if (d) d.open = true;
     },
     'steckbrief-fenster': steckbriefFenster,
+    'bild-menue': function (b) {
+      var e = eintrag(S.karteId), r = b.getBoundingClientRect();
+      if (e) auswahlMenue(r.left, r.bottom + 2, null, bildOptionen(e));
+    },
+    'bild-stil': function (b) {
+      var hinweis = $('#bild-hinweis');
+      if (hinweis) S.bildKi.hinweis = hinweis.value;
+      S.bildKi.stil = b.dataset.stil;
+      render();
+    },
+    'bild-erzeugen': bildErzeugen,
+    'bild-nehmen': function () {
+      var v = S.bildKi;
+      bildSpeichern(v.id, 'data:' + v.vorschlag.mime + ';base64,' + v.vorschlag.daten);
+      S.bildKi = null;
+      render();
+    },
+    'bild-ki-zu': function () { S.bildKi = null; render(); },
     'schreibtag': function (b) {
       var n = Number(b.dataset.tag), tage = (S.einst.schreibtage || []).slice();
       tage = tage.indexOf(n) >= 0 ? tage.filter(function (x) { return x !== n; }) : tage.concat([n]);
@@ -2009,6 +2154,7 @@
       S.ordnerUrl = d.ordnerUrl;
       S.kontoSprache = d.kontoSprache;
       S.version = d.version;
+      S.bilder = d.bilder || {};
       S.standardArten = d.standardArten || {};
       S.kurzeArten = d.kurzeArten || {};
       S.fensterZeit = d.fensterStand ? d.fensterStand.zeit : 0;

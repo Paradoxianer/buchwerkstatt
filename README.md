@@ -38,6 +38,7 @@ Die Grundidee: **Es gibt nur einen Notizblock.** Das erste Wort einer Notiz ents
 - **🗂️ Ausführlicher Steckbrief:** Personen haben einen Fragebogen mit acht Bereichen (Grunddaten, Aussehen, Familie, Beziehungen, Arbeit & Alltag, Innenleben, Auftreten, In der Geschichte). Jedes Feld hat eine Leitfrage, damit man jeden Bereich wirklich durchdenkt. Orte und Gegenstände haben kleinere Fragebögen.
   - In der Seitenleiste lassen sich die Bereiche aufklappen; daneben steht, wie viel schon ausgefüllt ist.
   - **★ Stern:** Felder mit Stern stehen auf der Karte ganz oben, ohne Aufklappen. Mit ☆ neben einem Feld kommt es dazu, mit ★ wieder weg – das gilt für alle Karten derselben Art. Voreingestellt sind die wichtigsten Felder (Alter, Aussehen, Beruf …).
+  - **🖼️ Bild:** Ein Klick auf den runden Avatar einer Karte lädt ein Bild hoch oder lässt Gemini eines malen (gemalt, Foto oder Skizze, nach Steckbrief und Beschreibung, mit optionalem Wunsch wie „mit Hut“). Das Original liegt als JPEG im Welt-Ordner, die Vorschau im Blatt „Bilder“ der Tabelle; das Bild erscheint auch im Personenblatt.
   - **⤢ Im großen Fenster öffnen** öffnet ein großes Fenster: links die Bereiche mit Fortschritt, rechts die Fragen mit viel Platz. Das Manuskript bleibt dabei bedienbar.
   - Mit KI schlägt **✨ Aus den Notizen vorschlagen** Antworten für den gerade offenen Bereich vor.
   - Unter **⚙️ Mehr → Schlüsselwörter & Felder** lässt sich zwischen ausführlichem Fragebogen und kurzer Liste wechseln oder alles selbst schreiben: `# Familie` beginnt einen Bereich, `Eltern | Wer sind die Eltern?` gibt dem Feld eine Leitfrage.
@@ -94,7 +95,7 @@ Für den eigenen Gebrauch reicht es, die Erweiterung als Apps-Script-Projekt an 
 
 1. Manuskript öffnen → **Erweiterungen → Apps Script**.
 2. Für jede Datei aus dem Ordner [`src/`](src) im Editor über **＋ → Skript** (für `.gs`) bzw. **＋ → HTML** (für `.html`) eine Datei **mit gleichem Namen** anlegen und den Inhalt hineinkopieren:
-   `Main`, `Store`, `Ablage`, `Sprachen`, `Fragebogen`, `Dokument`, `Blaetter`, `Ki`, `Statistik` (Skript) sowie `Sidebar`, `Styles`, `I18n`, `I18n_fr`, `I18n_es`, `I18n_it`, `I18n_pt`, `I18n_nl`, `Core`, `App`, `Fenster`, `Fenster_Steckbrief` (HTML). Die vorhandene `Code.gs` kann gelöscht werden.
+   `Main`, `Store`, `Ablage`, `Sprachen`, `Fragebogen`, `Dokument`, `Blaetter`, `Bilder`, `Ki`, `Statistik` (Skript) sowie `Sidebar`, `Styles`, `I18n`, `I18n_fr`, `I18n_es`, `I18n_it`, `I18n_pt`, `I18n_nl`, `Core`, `App`, `Fenster`, `Fenster_Steckbrief` (HTML). Die vorhandene `Code.gs` kann gelöscht werden.
 3. **⚙️ Projekteinstellungen → „Manifestdatei appsscript.json im Editor anzeigen“** aktivieren und den Inhalt von [`src/appsscript.json`](src/appsscript.json) übernehmen.
 4. Speichern, das Manuskript neu laden → **Erweiterungen → Buchwerkstatt → Buchwerkstatt öffnen**.
 
@@ -134,8 +135,10 @@ src/            Apps-Script-Projekt (wird mit clasp hochgeladen)
   Fragebogen.gs   Ausführliche Steckbriefe (Bereiche mit Leitfragen) je Sprache
   Dokument.gs     Cursor, Textstellen (Named Ranges), Kapitel, Markieren, Vorkommen
   Blaetter.gs     Personenblätter als Google Docs
-  Ki.gs           Claude-API (Felder füllen, Widersprüche prüfen)
+  Bilder.gs       Bilder zu Karten (Original in Drive, Vorschau im Blatt „Bilder“)
+  Ki.gs           Claude- und Gemini-API (Felder füllen, Widersprüche prüfen, Bilder malen)
   Statistik.gs    Wortzahl & Tagesverlauf
+  Version.gs      Versionsstempel – entsteht beim Hochladen (npm run push), nicht im Repo
   Sidebar.html    Gerüst der Seitenleiste
   Styles.html     Aussehen
   I18n.html       Übersetzungen der Oberfläche (Deutsch, Englisch) und Sprachwahl
