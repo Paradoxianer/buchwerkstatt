@@ -163,6 +163,74 @@ Weil die App sensible Bereiche nutzt, prüft Google sie vor der Veröffentlichun
 6. **`script.external_request`:** Unter Mehr → KI-Hilfe einen Gemini- oder Anthropic-Schlüssel eintragen, auf einer Karte „Fill in profile“ klicken und den Vorschlag zeigen. Erklären, dass nur bei diesem ausdrücklichen Klick Text an die gewählte KI-API geht.
 7. **Löschen:** eine Karte löschen; das Personenblatt wandert in den Papierkorb.
 
+### Englisches Sprechskript
+
+Zum Vorlesen beim Aufnehmen oder als Untertitel. Links steht, was im Bild zu sehen ist, darunter der Sprechtext.
+
+**Vorbereitung:**
+- Das Testdokument „Das Haus am Fluss – Testmanuskript“ öffnen.
+- Die Buchwerkstatt unter ⚙️ Mehr → Sprache auf **English** stellen, damit die Prüfer die Oberfläche lesen können. Die Schlüsselwörter heißen dann `Character`, `Place` …
+- Für Szene 6 einen Gemini- oder Anthropic-Schlüssel bereithalten.
+- Bildschirm in 1080p aufnehmen, Browser-Zoom 100 %.
+
+Für das Personenblatt in Szene 5 reicht ein Klick auf „📄 Create all documents now“.
+
+---
+
+**Scene 1 – Intro and consent screen (≈ 30 s)**
+*Bild: Testdokument offen. Extensions → Add-ons → Buchwerkstatt installieren bzw. starten. Der Google-Zustimmungsbildschirm erscheint. Auf die Adresszeile klicken und heranzoomen, sodass die `client_id=…` lesbar ist. Kurz durch die Liste der Berechtigungen scrollen, dann „Allow“.*
+
+> Hi, this is a short demo of Buchwerkstatt, a Google Docs add-on for novelists. It keeps characters, places, a timeline and notes right next to the manuscript.
+> I'm opening a test manuscript and starting the add-on. This is the Google consent screen. In the address bar you can see the OAuth client ID of our project. The add-on asks for access to the current document, to spreadsheets, to files it creates itself, for showing its sidebar, and for optional external requests. I'll show each of these in this video. I click Allow.
+
+**Scene 2 – `script.container.ui` (≈ 15 s)**
+*Bild: Extensions → Buchwerkstatt → Open. Die Seitenleiste erscheint, kurz über die Tabs fahren.*
+
+> The scope script.container.ui is used only to show this sidebar and the entry in the Extensions menu. Everything the add-on does happens from here.
+
+**Scene 3 – `documents` (≈ 50 s)**
+*Bild:*
+1. In einen Absatz in Kapitel 2 klicken; die Seitenleiste zeigt das Kapitel.
+2. Das Wort „Mühle“ markieren, eine Notiz tippen („The mill should feel abandoned“), mit 📌 anheften.
+3. Woanders hinklicken, dann im ⋯-Menü der Notiz „📌 Go to passage“; das Dokument springt zurück und markiert das Wort.
+4. Danach unter ⚙️ More „🖍️ Highlight names in the text“, die Namen werden farbig; mit „Remove highlights“ wieder entfernen.
+
+> The documents scope lets the add-on read the open manuscript. When I click into the text, the sidebar knows which chapter I'm in.
+> I select a word and pin a note to it. The add-on stores a named range in the document, so later I can jump straight back to that passage.
+> Optionally it can highlight all character names in the text, and remove the highlighting again. The add-on only works with the document that is open and the documents it creates for the user.
+
+**Scene 4 – `spreadsheets` (≈ 30 s)**
+*Bild: Ins Notizfeld `Character Lena Hartmann: 34, returns to her father's mill` tippen und speichern. Die Karte erscheint unter „World“. Dann unter ⚙️ More „📊 Open the spreadsheet with all entries“: die Tabelle im neuen Tab zeigen, die Zeile mit Lena markieren.*
+
+> All notes and cards are stored in a Google Sheet in the user's own Drive. When I type "Character Lena Hartmann" in the note field, a character card is created.
+> Here is that spreadsheet: the add-on created it next to the manuscript, and Lena is in it as a row. The user owns this data and can read or edit it directly. There is no server of our own.
+
+**Scene 5 – `drive.file` (≈ 35 s)**
+*Bild: Unter ⚙️ More auf „📄 Create all documents now“ klicken. Dann Google Drive öffnen, den Ordner „Das Haus am Fluss – Testmanuskript – Buchwerkstatt“ zeigen, darin die Tabelle und den Unterordner mit dem Dokument „Lena Hartmann“. Das Dokument kurz öffnen.*
+
+> The drive.file scope is used only for files the add-on creates itself. It creates one folder next to the manuscript and puts the spreadsheet and the card documents inside. The card documents make the characters usable as smart chips in the Docs mobile app.
+> With drive.file, the add-on can create, rename, move and trash only these files. It cannot see any other file in the user's Drive.
+
+**Scene 6 – `script.external_request` (≈ 40 s)**
+*Bild:*
+1. ⚙️ More → „AI help (optional)“: den eigenen API-Schlüssel einfügen (den Schlüssel danach unkenntlich machen oder vorher im Video verpixeln).
+2. Lenas Karte öffnen, „✨ Fill in profile“ klicken; der Vorschlag erscheint, „Apply“ klicken.
+3. Optional: Avatar anklicken → „✨ Create image with AI“ (nur Gemini).
+
+> The last scope, script.external_request, is only used by the optional AI help. It is off by default. To use it, users enter their own Gemini or Anthropic API key.
+> Only when I explicitly click "Fill in profile", this card's text and the related notes are sent to the AI provider I chose. The suggestion comes back here, and nothing is changed until I click Apply.
+> No data is sent to anyone else, and the add-on works fully without AI.
+
+**Scene 7 – Deleting (≈ 15 s)**
+*Bild: Auf Lenas Karte ⋯ → „🗑️ Delete card“, mit „Yes, delete“ bestätigen. In Drive zeigen, dass das Dokument „Lena Hartmann“ im Papierkorb liegt.*
+
+> When I delete a card, its row is removed from the spreadsheet and its card document is moved to the trash. Again, only files the add-on created are touched.
+
+**Scene 8 – Outro (≈ 10 s)**
+*Bild: Seitenleiste mit Manuskript.*
+
+> That's Buchwerkstatt: all data stays in the user's own Google Drive, and every scope is used only for the features shown here. Thanks for reviewing.
+
 In das Begründungsfeld kommen die englischen Texte aus der Tabelle in Schritt 4. Rückfragen von Google kommen per E-Mail an die Support-Adresse. Meist geht es um Details der Datenschutzerklärung oder des Videos.
 
 ## 8. Einreichen
