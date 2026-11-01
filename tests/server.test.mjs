@@ -159,8 +159,8 @@ function welt() {
     CacheService: { getDocumentCache: () => cache }
   };
   const namen = Object.keys(globals);
-  const fns = new Function(...namen, code + '; return { bwSpeichern, bwBlaetterSync, bwLoeschen, bwLaden, datenbank_, bwFelderSetzen, bwEintraegeLesen, bwEinstellungenSpeichern, bwObenSetzen, bwTabelleNeuAnlegen, bwBildSetzen, bwBildEntfernen, einstellungen_, fragebogen_, kurzeFelder_, namensmuster_, fundstellen_, bwReihenfolgeSetzen, bwWerteSetzen, bwFensterLoeschen, fensterStand_, neueAusfuehrung: function () { bwCacheDb_ = null; bwCacheSprache_ = null; } };')(...namen.map((n) => globals[n]));
-  return { fns, dateien, docs, dokProps, zugriff, tabellen };
+  const fns = new Function(...namen, code + '; return { bwSpeichern, bwBlaetterSync, bwLoeschen, bwLaden, datenbank_, bwFelderSetzen, bwEintraegeLesen, bwEinstellungenSpeichern, bwObenSetzen, bwTabelleNeuAnlegen, bwBildSetzen, bwBildEntfernen, einstellungen_, fragebogen_, kurzeFelder_, namensmuster_, fundstellen_, bwReihenfolgeSetzen, bwWerteSetzen, bwFensterLoeschen, fensterStand_, bwLandkartenLaden, bwLandkarteSpeichern, bwLandkartePunkt, bwLandkarteBildSetzen, bwLandkarteBild, bwLandkarteLoeschen, neueAusfuehrung: function () { bwCacheDb_ = null; bwCacheSprache_ = null; } };')(...namen.map((n) => globals[n]));
+  return { fns, dateien, docs, dokProps, zugriff, tabellen, dbBlatt: (n) => tabellen[dokProps.getProperty('BW_DATENBANK')].getSheetByName(n) };
 }
 
 test('Tabelle und Ordner werden angelegt, auch ohne Zugriff auf den Ordner des Manuskripts', () => {
@@ -368,4 +368,44 @@ test('Zeitstrahl: Reihenfolge und einzelne Werte speichern, Seitenleiste erfähr
   const stand = fns.fensterStand_();
   for (const id of [a.id, b.id, c.id]) assert.ok(stand.ids.includes(id), 'alle Änderungen gemeldet, nicht nur die letzte');
   assert.equal(fns.bwLaden().eintraege.length, 2);
+});
+
+test('Landkarten: Fähnchen einzeln setzen, Bild in Stücken in der Tabelle, löschen', () => {
+  const { fns, dbBlatt } = welt();
+  assert.deepEqual(fns.bwLandkartenLaden(), [], 'ohne Karten kein neues Blatt');
+  const hafen = fns.bwSpeichern({ art: 'ort', name: 'Hafen', text: '' }, {});
+  const k = fns.bwLandkarteSpeichern({ name: 'Die Küste' });
+  assert.ok(k.id);
+  assert.equal(k.bild, false);
+  fns.bwLandkartePunkt(k.id, hafen.id, [0.25, 1.7]);
+  fns.bwLandkartePunkt(k.id, 'o2', [0.123456, 0.5]);
+  fns.bwLandkartePunkt(k.id, 'o2', null);
+  fns.bwLandkarteSpeichern({ id: k.id, name: 'Küste' });
+  let geladen = fns.bwLandkartenLaden();
+  assert.equal(geladen.length, 1);
+  assert.equal(geladen[0].name, 'Küste');
+  assert.deepEqual(geladen[0].orte, { [hafen.id]: [0.25, 1] }, 'auf die Karte begrenzt, entferntes Fähnchen weg');
+
+  // Ein Bild größer als eine Zelle wird auf mehrere Zeilen verteilt und wieder zusammengesetzt.
+  const bild = 'data:image/jpeg;base64,' + 'A'.repeat(120000);
+  fns.bwLandkarteBildSetzen(k.id, bild, 2400.4, 1600);
+  assert.equal(dbBlatt('Kartenbilder').getLastRow() - 1, 3, 'drei Stücke');
+  assert.equal(fns.bwLandkarteBild(k.id), bild);
+  geladen = fns.bwLandkartenLaden()[0];
+  assert.equal(geladen.bild, true);
+  assert.equal(geladen.breite, 2400);
+  assert.deepEqual(geladen.orte, { [hafen.id]: [0.25, 1] }, 'Fähnchen bleiben beim Bildtausch');
+
+  // Zweite Karte, Bild tauschen: nur die eigenen Stücke werden ersetzt.
+  const k2 = fns.bwLandkarteSpeichern({ name: 'Stadt' });
+  fns.bwLandkarteBildSetzen(k2.id, 'data:image/jpeg;base64,BBBB', 10, 10);
+  fns.bwLandkarteBildSetzen(k.id, 'data:image/jpeg;base64,CCCC', 10, 10);
+  assert.equal(fns.bwLandkarteBild(k.id), 'data:image/jpeg;base64,CCCC');
+  assert.equal(fns.bwLandkarteBild(k2.id), 'data:image/jpeg;base64,BBBB');
+  assert.throws(() => fns.bwLandkarteBildSetzen(k.id, 'kein Bild', 1, 1));
+
+  fns.bwLandkarteLoeschen(k.id);
+  assert.deepEqual(fns.bwLandkartenLaden().map((x) => x.name), ['Stadt']);
+  assert.equal(fns.bwLandkarteBild(k.id), '');
+  assert.equal(fns.bwLaden().eintraege.length, 1, 'der Ort selbst bleibt');
 });

@@ -35,7 +35,8 @@ DRANBLEIBEN BIS ZUM LETZTEN KAPITEL
 Gib dein Buchziel und dein Abgabedatum ein und wähle deine Schreibtage – die Buchwerkstatt rechnet aus, wie viele Wörter pro Tag nötig sind, und zeigt deinen Fortschritt.
 
 UND AUSSERDEM
-• Zeitstrahl, filterbar nach Figur, und Ideen-Pinnwand
+• Zeitstrahl zum Umsortieren, mit Zeitabschnitten, und Ideen-Pinnwand
+• Eigene Landkarte: Lade deine gezeichnete Karte hoch und setze die Orte als Fähnchen darauf
 • Beziehungen zwischen Figuren („Tochter von“), eigene Felder und Kartenarten
 • Personenblätter als Google Docs – so funktioniert @Lena auch in der Docs-App am Handy
 • Sieben Sprachen: Deutsch, Englisch, Französisch, Spanisch, Italienisch, Portugiesisch, Niederländisch
@@ -75,7 +76,8 @@ KEEP GOING TO THE LAST CHAPTER
 Enter your book goal and deadline and pick your writing days – Buchwerkstatt works out how many words per day you need and shows your progress.
 
 AND MORE
-• Timeline, filterable by character, and an idea board
+• A timeline you can rearrange, with sections, and an idea board
+• Your own map: upload your hand-drawn map and place your locations on it as flags
 • Relationships between characters (“daughter of”), your own fields and card types
 • Card documents as Google Docs – so @Lena also works in the Docs app on your phone
 • Seven languages: German, English, French, Spanish, Italian, Portuguese, Dutch

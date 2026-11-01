@@ -44,6 +44,7 @@ Die Grundidee: **Es gibt nur einen Notizblock.** Das erste Wort einer Notiz ents
   - Unter **⚙️ Mehr → Schlüsselwörter & Felder** lässt sich zwischen ausführlichem Fragebogen und kurzer Liste wechseln oder alles selbst schreiben: `# Familie` beginnt einen Bereich, `Eltern | Wer sind die Eltern?` gibt dem Feld eine Leitfrage.
 - **📅 Zeitstrahl:** Ereignisse nach Datum im Buch sortiert, filterbar nach Figur. Erkannt werden z. B. „12. März“, „3.4.1987“ und „Tag 5“.
 - **💡 Pinnwand:** Ideen nach offen, verwendet und verworfen sortiert.
+- **🗺️ Landkarte:** Eine eigene Karte (Zeichnung, Scan, Foto) hochladen und die Orte als Fähnchen darauf verteilen – aus der Liste ziehen oder per Doppelklick neu anlegen. Ein Klick aufs Fähnchen zeigt Steckbrief-Felder, Beschreibung und Verbindungen. Mehrere Karten pro Buch (Welt, Stadt …); das Bild liegt in der Tabelle, damit alle Mitschreibenden es sehen. Zu finden bei den Orten (**🗺️ Landkarte**) und im ⋯-Menü eines Ortes.
 - **🎯 Ziel:** Wörter heute, Tagesziel, Verlauf der letzten 14 Tage, Serie und Fortschritt fürs ganze Buch.
 - **📄 Personenblätter fürs Handy:** Zu jeder Karte entsteht automatisch ein kleines Google Doc im Ordner „*Buchtitel* – Welt“. Damit funktioniert in Google Docs **`@Lena`** als Verweis (Smart Chip), auch in der **Docs-App am iPhone**. Die Blätter sind untereinander verlinkt.
 - **🖍️ Namen im Text markieren:** Färbt alle Namen im Manuskript ein. Ein Klick entfernt die Markierungen wieder.

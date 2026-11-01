@@ -1028,6 +1028,7 @@
       }).sort(function (x, y) { return x.name.localeCompare(y.name, I.locale()); });
       if (q && !liste.length) return;
       html += '<div class="gruppe"><div class="gruppe-kopf">' + a.icon + ' ' + h(a.mehrzahl || a.name) + ' <span class="zahl">' + liste.length + '</span>' +
+        (a.id === 'ort' ? '<button class="knopf klein" data-aktion="landkarte-fenster" title="' + th('lk.fenster.info') + '">🗺️ ' + th('lk.fenster') + '</button>' : '') +
         '<button class="knopf klein" data-aktion="neu-karte" data-art="' + a.id + '">' + th('welt.neu') + '</button></div>';
       if (S.neuIn === a.id) {
         html += '<div class="neu-zeile"><input id="neu-name" placeholder="' + th('welt.name', { art: a.name }) + '"><button class="knopf primaer klein" data-aktion="neu-karte-ok" data-art="' + a.id + '">' + th('welt.anlegen') + '</button></div>';
@@ -1218,6 +1219,16 @@
       if (laufend > 0) { setTimeout(oeffne, 150); return; }
       rufe('bwFensterOeffnen', 'zeitstrahl', {}, t('zeit.fenster.titel'))
         .then(frei, function (err) { frei(); toast(fehlertext(err), { fehler: true }); });
+    })();
+  }
+
+  /** Landkarte im großen Fenster – mit id: dieses Fähnchen zeigen. */
+  function landkarteFenster(id) {
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    (function oeffne() {
+      if (laufend > 0) { setTimeout(oeffne, 150); return; }
+      rufe('bwFensterOeffnen', 'landkarte', id ? { id: id } : {}, t('lk.titel'))
+        .catch(function (err) { toast(fehlertext(err), { fehler: true }); });
     })();
   }
 
@@ -2158,6 +2169,7 @@
       var r = b.getBoundingClientRect();
       var optionen = [{ html: th('karte.menue.notiz', { name: e.name }), tun: AKTIONEN['notiz-zu'] }];
       if ((art(e.art).felder || []).length) optionen.push({ html: th('karte.ausfuehrlich'), tun: steckbriefFenster });
+      if (e.art === 'ort') optionen.push({ html: '🗺️ ' + th('lk.zeigen'), tun: function () { landkarteFenster(e.id); } });
       bildOptionen(e).forEach(function (o) { optionen.push(o); });
       if (e.blatt) optionen.push({ html: th('karte.menue.blattAuf'), tun: function () { window.open('https://docs.google.com/document/d/' + e.blatt + '/edit', '_blank'); } });
       else optionen.push({ html: th('karte.menue.blattNeu'), tun: function () { S.blaetterOffen[e.id] = true; blaetterSenden().then(function () { toast(t('karte.menue.blattFertig')); }); } });
@@ -2181,6 +2193,7 @@
     'bearbeiten-ok': function (b) { bearbeitenFertig(b.dataset.id); },
     'bearbeiten-abbruch': function () { S.bearbeiten = null; render(); },
     'zeit-fenster': zeitFenster,
+    'landkarte-fenster': function () { landkarteFenster(); },
     'zeit-ki': zeitKiFragen,
     'zeit-ki-ja': function () {
       var ids = S.zeitKi.reihenfolge;

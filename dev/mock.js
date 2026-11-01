@@ -24,6 +24,8 @@
       { id: 'p2', art: 'person', name: 'Heinrich Berger', aliase: ['Vater', 'der Alte'], text: 'Lenas Vater. Verschwand 1987 ohne ein Wort.', felder: { Alter: '68' }, bezug: [], status: '', anker: '', kapitel: '', blatt: '', erstellt: '2026-10-20 09:20', geaendert: '' },
       { id: 'p3', art: 'person', name: 'Jonas', aliase: [], text: 'Fischer, kennt Lena aus der Schulzeit.', felder: {}, bezug: [], status: '', anker: '', kapitel: '', blatt: '', erstellt: '2026-10-21 18:02', geaendert: '' },
       { id: 'o1', art: 'ort', name: 'Hafen', aliase: ['Kai'], text: 'Riecht nach Diesel, alte Kräne, Möwen.', felder: { Atmosphäre: 'rau, laut, salzig' }, bezug: [], status: '', anker: '', kapitel: '', blatt: '', erstellt: '2026-10-21 18:10', geaendert: '' },
+      { id: 'o2', art: 'ort', name: 'Mühle am Wehr', aliase: ['Mühle'], text: 'Verfallen, das Mühlrad steht still. Hier hat Heinrich als Junge gespielt.', felder: { Lage: 'flussaufwärts, am Wehr' }, bezug: [], status: '', anker: '', kapitel: '', blatt: '', erstellt: '2026-10-21 18:12', geaendert: '' },
+      { id: 'o3', art: 'ort', name: 'Leuchtturm', aliase: [], text: '', felder: {}, bezug: [], status: '', anker: '', kapitel: '', blatt: '', erstellt: '2026-10-21 18:14', geaendert: '' },
       { id: 'd1', art: 'ding', name: 'Taschenuhr', aliase: ['die Uhr'], text: 'Gehörte dem Vater. Gravur auf der Rückseite: „Für H.“', felder: {}, bezug: [], status: '', anker: '|nr2', kapitel: kapitel[2], blatt: '', erstellt: '2026-10-22 07:44', geaendert: '' },
       { id: 'n1', art: 'notiz', name: '', text: 'Hier muss klarer werden, dass Lena die Uhr schon als Kind gesehen hat. @Jonas könnte das erwähnen.', felder: {}, bezug: [], status: '', anker: '|nr3', kapitel: kapitel[1], blatt: '', erstellt: '2026-10-23 21:30', geaendert: '' },
       { id: 'n2', art: 'notiz', name: '', text: 'Szene am Kai kürzen – zu viel Beschreibung. Vielleicht trifft sie hier schon @Kowalski?', felder: {}, bezug: [], status: '', anker: '|nr4', kapitel: kapitel[1], blatt: '', erstellt: '2026-10-24 08:05', geaendert: '' },
@@ -36,7 +38,17 @@
     ],
     beziehungen: [{ id: 'b1', von: 'p1', nach: 'p2', art: 'Tochter von' }],
     textstellen: { '|nr1': { kapitel: kapitel[0], pos: 12, tab: '' }, '|nr2': { kapitel: kapitel[2], pos: 70, tab: '' }, '|nr3': { kapitel: kapitel[1], pos: 40, tab: '' }, '|nr4': { kapitel: kapitel[1], pos: 31, tab: '' } },
-    ki: false
+    ki: false,
+    // #leer im Fenster: noch keine Landkarte
+    landkarten: /leer/.test(location.hash) ? [] : [{ id: 'k1', name: 'Die Küste', orte: { o1: [0.62, 0.58], o2: [0.3, 0.32] }, breite: 1200, hoehe: 800, bild: true }],
+    kartenbilder: { k1: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800">' +
+      '<rect width="1200" height="800" fill="#a9cfe0"/>' +
+      '<path d="M140 120 C320 40 620 90 820 160 S1100 300 1060 480 S900 760 640 720 S220 700 170 540 S20 220 140 120Z" fill="#efe3c4" stroke="#7a5c3a" stroke-width="4"/>' +
+      '<path d="M260 230 C380 300 470 360 560 470 S700 640 760 790" fill="none" stroke="#5d8fb0" stroke-width="10" stroke-linecap="round"/>' +
+      '<g fill="#6b8f4e" opacity=".7"><circle cx="820" cy="300" r="40"/><circle cx="870" cy="330" r="34"/><circle cx="790" cy="350" r="30"/></g>' +
+      '<path d="M380 160 l30 -50 l30 50 M430 170 l26 -44 l26 44" fill="none" stroke="#7a5c3a" stroke-width="4"/>' +
+      '<text x="600" y="110" font-family="Georgia" font-style="italic" font-size="38" fill="#7a5c3a" text-anchor="middle">Die Küste</text></svg>') }
   };
 
   // Sprache des „Google-Kontos“ aus der Adresse: #en, #fr, #es …
@@ -167,9 +179,29 @@
       return { aktiv: db.ki, ende: 'abcd', anbieter: db.kiAnbieter };
     },
     bwFensterOeffnen: function (ansicht, start) {
-      window.open('fenster.html#' + (ansicht === 'zeitstrahl' ? 'zeit' : 'id=' + start.id), '_blank', 'width=980,height=680');
+      var ziel = ansicht === 'zeitstrahl' ? 'zeit' : ansicht === 'landkarte' ? 'karte' + (start.id ? '&id=' + start.id : '') : 'id=' + start.id;
+      window.open('fenster.html#' + ziel, '_blank', 'width=980,height=680');
       return true;
     },
+    bwLandkartenLaden: function () { return JSON.parse(JSON.stringify(db.landkarten)); },
+    bwLandkarteBild: function (id) { return db.kartenbilder[id] || ''; },
+    bwLandkarteSpeichern: function (k) {
+      var x = db.landkarten.filter(function (y) { return y.id === k.id; })[0];
+      if (!x) { x = { id: neueId(), name: '', orte: {}, breite: 0, hoehe: 0, bild: false }; db.landkarten.push(x); }
+      x.name = k.name || x.name;
+      return JSON.parse(JSON.stringify(x));
+    },
+    bwLandkartePunkt: function (kid, id, pos) {
+      var x = db.landkarten.filter(function (y) { return y.id === kid; })[0];
+      if (pos) x.orte[id] = pos; else delete x.orte[id];
+      return JSON.parse(JSON.stringify(x));
+    },
+    bwLandkarteBildSetzen: function (kid, bild, b, hh) {
+      var x = db.landkarten.filter(function (y) { return y.id === kid; })[0];
+      db.kartenbilder[kid] = bild; x.bild = true; x.breite = b; x.hoehe = hh;
+      return JSON.parse(JSON.stringify(x));
+    },
+    bwLandkarteLoeschen: function (kid) { db.landkarten = db.landkarten.filter(function (y) { return y.id !== kid; }); return true; },
     bwReihenfolgeSetzen: function (ids) {
       var neu = {};
       ids.forEach(function (id, i) { neu[id] = i + 1; });
